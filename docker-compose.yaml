@@ -1,0 +1,16 @@
+services:
+  db:
+    image: postgres:17
+    container_name: studio-ai
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: studio-ai
+      POSTGRES_USER: db-admin
+      POSTGRES_PASSWORD: 2Swisshype
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - studio-ai_data:/var/lib/postgresql/data
+
+volumes:
+  studio-ai_data:
