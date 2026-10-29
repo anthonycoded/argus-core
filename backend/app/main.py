@@ -5,7 +5,7 @@ from fastapi import FastAPI
 
 from app.database import Base, engine
 from app import models  # noqa: F401 — register SQLAlchemy models
-from app.routes import analysis, health, ingestion, topics
+from app.routes import analysis, health, ingestion, topics, research
 
 
 @asynccontextmanager
@@ -24,3 +24,4 @@ app.include_router(health.router)
 app.include_router(ingestion.router)
 app.include_router(topics.router)
 app.include_router(analysis.router)
+app.include_router(research.router)
