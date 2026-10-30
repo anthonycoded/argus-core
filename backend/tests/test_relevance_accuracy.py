@@ -42,7 +42,7 @@ ARTICLES = [
         "topic": "Netanyahu's bloc leading Israel election but short of majority",
         "title": "Israel's political system and history of coalition governments",
         "snippet": "An overview of how Israeli governments are formed and why elections frequently produce political deadlock.",
-        "expected": "relevant",
+        "expected": "partially_relevant",
     },
 
     # PARTIALLY RELEVANT
@@ -50,7 +50,7 @@ ARTICLES = [
         "topic": "Netanyahu's bloc leading Israel election but short of majority",
         "title": "Israel's economy faces uncertainty amid political instability",
         "snippet": "The article primarily examines inflation and economic growth, briefly mentioning the recent election.",
-        "expected": "partially_relevant",
+        "expected": "irrelevant",
     },
     {
         "topic": "Netanyahu's bloc leading Israel election but short of majority",
@@ -62,7 +62,7 @@ ARTICLES = [
         "topic": "Netanyahu's bloc leading Israel election but short of majority",
         "title": "Middle East tensions increase following regional military developments",
         "snippet": "The article focuses on regional security developments and briefly mentions Israel's domestic political situation.",
-        "expected": "partially_relevant",
+        "expected": "irrelevant",
     },
 
     # IRRELEVANT

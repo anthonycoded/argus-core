@@ -5,7 +5,7 @@ import logging
 import time
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit, quote_plus
 
 import feedparser
 import httpx
@@ -58,6 +58,7 @@ def new_research_metrics() -> dict[str, int]:
     return {
         "candidates_found": 0,
         "rss_candidates": 0,
+        "google_news_candidates": 0,
         "gdelt_candidates": 0,
         "classified_relevant": 0,
         "classified_partially_relevant": 0,
@@ -242,6 +243,88 @@ def discover_rss_sources(
     return ranked[:limit]
 
 
+async def discover_google_news_sources(
+    query: str,
+    limit: int = 10,
+) -> list[dict]:
+    """Discover topic-specific articles through Google News RSS."""
+
+    search_url = (
+        "https://news.google.com/rss/search?"
+        f"q={quote_plus(query)}&hl=en-US&gl=US&ceid=US:en"
+    )
+
+    try:
+        async with httpx.AsyncClient(
+            timeout=20.0,
+            headers={"User-Agent": "GlobalChessResearch/1.0"},
+            follow_redirects=True,
+        ) as client:
+            response = await client.get(search_url)
+            response.raise_for_status()
+
+        feed = feedparser.parse(response.content)
+
+        if getattr(feed, "bozo", False) and not feed.entries:
+            logger.warning("Could not parse Google News RSS")
+            return []
+
+        candidates = []
+        seen_urls = set()
+
+        for entry in feed.entries:
+            title = (entry.get("title") or "").strip()
+            link = (entry.get("link") or "").strip()
+
+            if not title or not link:
+                continue
+
+            if not link.startswith(("https://", "http://")):
+                continue
+
+            url = normalize_url(link)
+
+            if not url or url in seen_urls:
+                continue
+
+            seen_urls.add(url)
+
+            source = entry.get("source") or {}
+
+            candidates.append({
+                "title": title[:1000],
+                "url": url[:2048],
+                "publisher": (
+                    source.get("title") or "Google News"
+                )[:255],
+                "published_at": parse_published(entry),
+                "snippet": (
+                    entry.get("summary")
+                    or entry.get("description")
+                    or None
+                ),
+                "source_type": "google_news",
+            })
+
+            if len(candidates) >= limit:
+                break
+
+        logger.info(
+            "Google News discovered %s candidates for: %s",
+            len(candidates),
+            query,
+        )
+
+        return candidates
+
+    except httpx.HTTPError:
+        logger.exception("Google News request failed")
+        return []
+    except Exception:
+        logger.exception("Google News discovery failed")
+        return []
+
+
 async def _wait_for_gdelt_slot() -> bool:
     """Wait between calls and respect this process's GDELT cooldown."""
     global _last_gdelt_request
@@ -332,6 +415,7 @@ async def discover_sources(
     limit: int = 10,
     metrics: dict[str, int] | None = None,
     review_queue: list[dict] | None = None,
+    processed_urls: set[str] | None = None,
 ) -> list[dict]:
     
     """Discover, classify, and rank sources for a research topic."""
@@ -354,7 +438,22 @@ async def discover_sources(
     metrics["candidates_found"] += len(rss_candidates)
 
     accepted = []
-    seen_urls = set()
+
+    seen_urls = (
+        processed_urls
+        if processed_urls is not None
+        else set()
+    )
+
+    reviewed_urls = {
+        normalize_url(item.get("url", ""))
+        for item in review_queue
+        if item.get("url")
+    }
+
+    # Previously reviewed partial matches should not be
+    # classified again in subsequent research rounds.
+    seen_urls.update(reviewed_urls)
 
     async def classify_candidates(candidates: list[dict]) -> None:
         for item in candidates:
@@ -401,7 +500,10 @@ async def discover_sources(
                     "rationale": result.rationale,
                 }
 
-                review_queue.append(review_item)
+                if url not in reviewed_urls:
+                    review_queue.append(review_item)
+                    reviewed_urls.add(url)
+
                 continue
 
             else:
@@ -413,6 +515,20 @@ async def discover_sources(
             accepted.append(item)
 
     await classify_candidates(rss_candidates)
+
+    google_news_candidates = await discover_google_news_sources(
+        query=query,
+        limit=candidate_limit,
+    )
+
+    metrics["google_news_candidates"] += len(
+        google_news_candidates
+    )
+    metrics["candidates_found"] += len(
+        google_news_candidates
+    )
+
+    await classify_candidates(google_news_candidates)
 
     # # Use GDELT as a fallback if RSS did not provide enough
     # # AI-confirmed relevant articles.

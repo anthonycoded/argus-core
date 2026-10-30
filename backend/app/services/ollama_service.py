@@ -27,129 +27,190 @@ class RelevanceClassification(BaseModel):
 
 
 
+
 async def classify_article_relevance(
-        *,
-        topic: str,
-        title: str,
-        snippet: str | None = None,
-        ) -> RelevanceClassification | None:
-            
-            
-            system_prompt = """
-                You are a geopolitical research relevance classifier.
+    *,
+    topic: str,
+    title: str,
+    snippet: str | None = None,
+) -> RelevanceClassification | None:
 
-                Your task is to determine how useful an article is
-                for researching the supplied topic.
+    system_prompt = """
+You are a geopolitical research relevance classifier for Global Chess.
 
-                Evaluate the relationship between the article and
-                the research topic, not just whether the article
-                repeats the same keywords.
+Your task is to determine whether an article contributes useful
+information to researching a specific geopolitical topic.
 
-                CLASSIFICATIONS:
+Choose exactly one classification.
 
-                1. relevant
+CLASSIFICATION RULES:
 
-                Use relevant when an article:
+1. relevant
 
-                - Directly discusses the main event or development.
-                - Covers important people, organizations, or political
-                actors involved in the event.
-                - Discusses consequences, reactions, or developments
-                directly resulting from the event.
-                - Provides important background needed to understand
-                the event, including political systems, electoral
-                processes, coalition structures, or key participants.
-                - Mentions the main event without substantially
-                discussing it.
+Use this when the article directly covers:
+- The central event or development.
+- Important political actors involved in that event.
+- Immediate consequences or reactions to the event.
+- Developments resulting from the event.
+- Negotiations, decisions, or responses directly connected
+  to the event.
 
-                2. partially_relevant
+An article does NOT need extensive details to qualify.
+Direct coverage is sufficient.
 
-                Use partially_relevant when an article:
+2. partially_relevant
 
-                - It is not directly relevant to the research topic
-                -Discusses a related political or regional issue.
-                - It is informative and may lack direct relevance to the specific research topic
-                - Provides context that is useful but not essential.
-                - Provides background on related events, actors, or political dynamics.
-                - Provides historical context or analysis that informs the research topic.
-                - Covers a connected development without directly
-                addressing the central research question.
+Use this when the article provides meaningful context but
+does not directly cover the central event.
 
-                3. irrelevant
+Examples:
+- Explaining a country's electoral system.
+- Explaining political parties or coalition structures.
+- Historical background about political institutions.
+- Broader economic or regional developments that help explain
+  the central topic.
 
-                Use irrelevant when an article:
+The information must have a meaningful connection to the topic.
 
-                - Has no meaningful connection to the research topic.
-                - Covers an unrelated subject.
+3. irrelevant
 
-                IMPORTANT RULES:
+Use this when:
+- The article discusses an unrelated subject.
+- The connection exists only because of shared keywords.
+- The article briefly mentions the topic without providing
+  meaningful information about it.
+- The article discusses a different event with no useful
+  connection to the research question.
 
-                - Do not require the article to mention every detail
-                in the research topic.
-                - Do not downgrade an article simply because its
-                description or snippet is short.
-                - Coalition negotiations, opposition responses,
-                electoral systems, and coalition formation history
-                can be directly relevant to election research.
-                - A brief incidental mention is not enough to make
-                an unrelated article partially relevant.
-                - Judge only the supplied title and snippet.
-                - Never invent details not present in the input.
+DECISION PRIORITY:
 
-                Return only the requested structured classification.
-                """
+First ask:
+Does the article directly cover the central event or a
+development resulting from it?
+If yes, classify as relevant.
 
-            user_prompt = f"""
-            Research topic: {topic}
+If not, ask:
+Does it provide meaningful background or context that helps
+explain the central event?
+If yes, classify as partially_relevant.
 
-            Article title: {title}
+Otherwise classify as irrelevant.
 
-            Article description:
-            {snippet or "No description available."}
+IMPORTANT EDGE CASE:
 
-            Determine the article's research relevance.
-            """
+An article that investigates possible solutions, scenarios,
+or outcomes for the exact event described in the research
+topic is relevant.
 
+For example:
 
-            try:
-                async with httpx.AsyncClient(timeout=60.0) as client:
-                    response = await client.post(
-                        f"{OLLAMA_BASE_URL}/api/chat",
-                        json={
-                            "model": OLLAMA_MODEL,
-                            "stream": False,
-                            "format": RelevanceClassification.model_json_schema(),
-                            "messages": [
-                                {
-                                    "role": "system",
-                                    "content": (
-                                        system_prompt
-                                    ),
-                                },
-                                {
-                                    "role": "user",
-                                    "content": user_prompt,
-                                },
-                            ],
-                            "options": {
-                                "temperature": 0,
-                            },
+Topic: Israel's election deadlock is a sign of the country's
+deep divisions.
+
+Article: How could Israel break election deadlock?
+Here are four scenarios.
+
+Classification: relevant.
+
+The article directly examines possible resolutions to the
+central event. Do not downgrade it to partially_relevant
+simply because it provides analysis rather than breaking news. 
+
+EXAMPLES:
+
+Research topic: Netanyahu's bloc leading Israel election
+but short of majority.
+
+Article: Netanyahu bloc leads Israeli election but falls
+short of majority.
+Classification: relevant.
+Reason: Directly reports the central election result.
+
+Article: Israeli parties begin coalition negotiations
+after inconclusive election.
+Classification: relevant.
+Reason: Coalition negotiations are a direct development
+following the election.
+
+Article: How Israel's proportional electoral system works.
+Classification: partially_relevant.
+Reason: Explains the electoral system behind the political
+deadlock but does not report the specific election result.
+
+Article: Who are the major political parties in Israel?
+Classification: partially_relevant.
+Reason: Provides background on political actors.
+
+Article: Israel's economy faces uncertainty amid political
+instability. The article briefly mentions the election.
+Classification: irrelevant.
+Reason: The election is only mentioned incidentally.
+
+Article: Middle East tensions increase following regional
+military developments. The article briefly mentions
+Israel's domestic politics.
+Classification: irrelevant.
+Reason: The article focuses on a separate regional issue.
+
+IMPORTANT:
+- Judge only the supplied title and description.
+- Do not invent information.
+- Do not require exact keyword matches.
+- Do not confuse article depth with relevance.
+- Do not classify an incidental mention as meaningful context.
+- Return only the requested structured classification.
+"""
+
+    user_prompt = f"""
+Research topic:
+{topic}
+
+Article title:
+{title}
+
+Article description:
+{snippet or "No description available."}
+
+Classify the article according to the system instructions.
+"""
+
+    try:
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            response = await client.post(
+                f"{OLLAMA_BASE_URL}/api/chat",
+                json={
+                    "model": OLLAMA_MODEL,
+                    "stream": False,
+                    "format": RelevanceClassification.model_json_schema(),
+                    "messages": [
+                        {
+                            "role": "system",
+                            "content": system_prompt,
                         },
-                    )
+                        {
+                            "role": "user",
+                            "content": user_prompt,
+                        },
+                    ],
+                    "options": {
+                        "temperature": 0,
+                    },
+                },
+            )
 
-                    response.raise_for_status()
+            response.raise_for_status()
 
-                payload = response.json()
-                content = payload["message"]["content"]
+        payload = response.json()
+        content = payload["message"]["content"]
 
-                return RelevanceClassification.model_validate_json(content)
+        return RelevanceClassification.model_validate_json(content)
 
-            except (httpx.HTTPError, ValueError, KeyError, TypeError) as exc:
-                logger.warning(
-                    "Article relevance classification failed: %s",
-                    exc,
-                )
-                return None
+    except (httpx.HTTPError, ValueError, KeyError, TypeError) as exc:
+        logger.warning(
+            "Article relevance classification failed: %s",
+            exc,
+        )
+        return None
 
 
 async def analyze_topic_with_ollama(
