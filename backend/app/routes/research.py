@@ -41,10 +41,13 @@ async def research_topic(
     try:
         metrics = new_research_metrics()
 
+        review_queue = []
+
         discovered = await discover_sources(
             query=topic.title,
             limit=limit,
             metrics=metrics,
+            review_queue=review_queue,
         )
     except httpx.HTTPError as exc:
         raise HTTPException(
@@ -109,6 +112,7 @@ async def research_topic(
         "updated": updated,
         **metrics,
         "total_saved": len(saved_sources),
+        "review_queue": review_queue,
         "sources": [
             {
                 "id": source.id,

@@ -331,10 +331,16 @@ async def discover_sources(
     query: str,
     limit: int = 10,
     metrics: dict[str, int] | None = None,
+    review_queue: list[dict] | None = None,
 ) -> list[dict]:
+    
     """Discover, classify, and rank sources for a research topic."""
+
     if metrics is None:
         metrics = new_research_metrics()
+
+    if review_queue is None:
+        review_queue = []
    
 
     candidate_limit = min(limit * 3, 75)
@@ -377,8 +383,25 @@ async def discover_sources(
 
             elif result.classification == "partially_relevant":
                 metrics["classified_partially_relevant"] += 1
-              
-                logger.info("Held partial match for review: %s | %s",item["title"],result.rationale)
+
+                logger.info(
+                    "Held partial match for review: %s | %s",
+                    item["title"],
+                    result.rationale,
+                )
+
+                review_item = {
+                    "title": item["title"],
+                    "url": url,
+                    "publisher": item.get("publisher"),
+                    "published_at": item.get("published_at"),
+                    "snippet": item.get("snippet"),
+                    "source_type": item.get("source_type"),
+                    "classification": "partially_relevant",
+                    "rationale": result.rationale,
+                }
+
+                review_queue.append(review_item)
                 continue
 
             else:
