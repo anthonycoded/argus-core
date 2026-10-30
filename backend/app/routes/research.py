@@ -6,8 +6,13 @@ import httpx
 
 from app.database import get_db
 from app.models import ResearchSource, Topic
-from app.services.research_service import discover_sources
+from app.services.research_service import (
+    discover_sources,
+    new_research_metrics,
+)
+import logging
 
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/topics", tags=["Research"])
 
@@ -34,9 +39,12 @@ async def research_topic(
 
     
     try:
+        metrics = new_research_metrics()
+
         discovered = await discover_sources(
             query=topic.title,
             limit=limit,
+            metrics=metrics,
         )
     except httpx.HTTPError as exc:
         raise HTTPException(
@@ -80,6 +88,8 @@ async def research_topic(
 
     except Exception as exc:
         db.rollback()
+        logger.exception("Failed to save research sources")
+
         raise HTTPException(
             status_code=500,
             detail="Failed to save research sources",
@@ -97,6 +107,7 @@ async def research_topic(
         "discovered": len(discovered),
         "inserted": inserted,
         "updated": updated,
+        **metrics,
         "total_saved": len(saved_sources),
         "sources": [
             {
@@ -142,6 +153,7 @@ def list_research_sources(
             "snippet": source.snippet,
             "source_type": source.source_type,
             "discovered_at": source.discovered_at,
+         
         }
         for source in sources
     ]
