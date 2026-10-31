@@ -1,6 +1,7 @@
 import logging
 
 from app.schemas import ResearchAgentResult
+from app.services.synthesis_service import synthesize_research
 from app.services.research_planner import (
     generate_research_plan,
     evaluate_research_progress,
@@ -187,21 +188,79 @@ async def run_research_agent(
 
     final_sources = list(all_sources.values())
 
+
     if not final_sources:
         status = "incomplete"
         limitations.append(
             "No sources passed the relevance classification."
         )
+
+    elif final_decision is None:
+        status = "incomplete"
+        limitations.append(
+            "Research progress could not be evaluated."
+        )
+
+    elif final_decision.missing_information:
+        status = "incomplete"
+        limitations.extend(
+            final_decision.missing_information
+        )
+
+    elif final_decision.decision != "finish":
+        status = "incomplete"
+        limitations.append(
+            "Research stopped before all important questions "
+            "were adequately addressed."
+        )
+
     else:
         status = "completed"
+            # --------------------------------------------------
+    # 7. Synthesize collected evidence
+    # --------------------------------------------------
 
-    findings = (
-        f"Research collection finished after "
-        f"{rounds_completed} round(s). "
-        f"Collected {len(final_sources)} unique sources. "
-        "These results represent collected evidence, "
-        "not a verified final geopolitical analysis."
-    )
+    synthesis = None
+
+    if final_sources:
+        try:
+            synthesis = await synthesize_research(
+                topic=topic,
+                objective=plan.objective,
+                research_questions=research_questions,
+                sources=final_sources,
+            )
+
+            logger.info(
+                "Evidence synthesis completed for: %s",
+                topic,
+            )
+
+        except Exception:
+            logger.exception(
+                "Evidence synthesis failed for: %s",
+                topic,
+            )
+
+            limitations.append(
+                "Evidence synthesis failed. "
+                "Collected research sources are still available."
+            )
+
+            if status == "completed":
+                status = "incomplete"
+
+
+    if synthesis:
+        findings = synthesis.executive_summary
+    else:
+        findings = (
+            f"Research collection finished after "
+            f"{rounds_completed} round(s). "
+            f"Collected {len(final_sources)} unique sources. "
+            "These results represent collected evidence, "
+            "not a verified final geopolitical analysis."
+        )
 
     return ResearchAgentResult(
         topic=topic,
@@ -216,4 +275,5 @@ async def run_research_agent(
         decision_history=decision_history,
         findings=findings,
         limitations=limitations,
+        synthesis=synthesis,
     )
