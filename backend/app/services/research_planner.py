@@ -65,6 +65,7 @@ async def generate_research_plan(
     return ResearchPlan.model_validate_json(content)
 
 
+
 async def evaluate_research_progress(
     topic: str,
     questions: list[str],
@@ -72,13 +73,6 @@ async def evaluate_research_progress(
     round_number: int,
     max_rounds: int = 3,
 ) -> ResearchDecision:
-
-    if round_number >= max_rounds:
-        return ResearchDecision(
-            decision="finish",
-            reasoning="Maximum research rounds reached.",
-            missing_information=[],
-        )
 
     source_summaries = [
         {
@@ -89,25 +83,66 @@ async def evaluate_research_progress(
         for source in sources
     ]
 
+    is_final_round = round_number >= max_rounds
+
     system_prompt = """
-    You are a geopolitical research evaluator.
+    You are a rigorous geopolitical research evaluator
+    for Global Chess.
 
-    Evaluate whether the available sources provide
-    enough information to address the research questions.
+    Your job is to determine whether collected sources
+    provide enough evidence to address each research question.
 
-    Choose:
-    - continue: important questions remain unanswered.
-    - finish: sufficient evidence has been collected.
+    Evaluate every research question independently.
 
-    Do not assume information exists when it is not
-    present in the supplied sources.
+    For each question, determine whether the supplied sources:
+    - Directly provide an answer.
+    - Provide only partial information.
+    - Provide no meaningful information.
 
-    Return valid JSON only.
+    DECISION RULES:
+
+    Choose "finish" when:
+    - The available evidence adequately addresses the
+      important research questions.
+    - Additional searches are unlikely to materially
+      improve the research collection.
+
+    Choose "continue" when:
+    - Important research questions remain unanswered.
+    - Important actors, events, causes, or consequences
+      lack supporting sources.
+    - More targeted research could improve coverage.
+
+    MISSING INFORMATION:
+
+    - List specific unanswered or inadequately supported
+      research questions.
+    - Do not list questions that are already adequately
+      addressed by the supplied evidence.
+    - Never invent answers or assume information exists.
+
+    IMPORTANT:
+    - A large number of sources does not automatically
+      mean the research is complete.
+    - Multiple articles repeating the same information
+      do not necessarily provide independent corroboration.
+    - A source title or short snippet may be insufficient
+      to answer a research question.
+    - Distinguish evidence from assumptions.
+    - Do not treat a lack of information as proof.
+
+    Return only the requested structured classification.
     """
 
     user_prompt = f"""
-    Topic:
+    Research topic:
     {topic}
+
+    Research round:
+    {round_number} of {max_rounds}
+
+    Is this the final permitted research round?
+    {is_final_round}
 
     Research questions:
     {questions}
@@ -115,7 +150,15 @@ async def evaluate_research_progress(
     Available sources:
     {source_summaries}
 
-    Should research continue?
+    Evaluate the evidence and decide whether research
+    should continue.
+
+    If this is the final round, choose "finish" because
+    no further rounds are available, but still list every
+    important unanswered question in missing_information.
+
+    If research is sufficiently complete, use an empty
+    missing_information list.
     """
 
     async with httpx.AsyncClient(timeout=120.0) as client:
@@ -146,3 +189,5 @@ async def evaluate_research_progress(
     content = response.json()["message"]["content"]
 
     return ResearchDecision.model_validate_json(content)
+
+
