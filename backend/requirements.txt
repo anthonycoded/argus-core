@@ -28,6 +28,7 @@ pluggy==1.7.0
 psycopg==3.3.6
 psycopg-binary==3.3.6
 pydantic==2.14.1
+pydantic-settings==2.16.2
 pydantic_core==2.50.1
 Pygments==2.21.0
 pytest==9.2.0

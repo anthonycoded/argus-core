@@ -1,6 +1,7 @@
 
-import os
+from app.core.config import settings
 
+# Global Chess-specific RSS sources.
 FEEDS = {
     "BBC World": "https://feeds.bbci.co.uk/news/world/rss.xml",
     "NPR Politics": "https://feeds.npr.org/1014/rss.xml",
@@ -30,12 +31,6 @@ KEYWORDS = {
     "geopolitics": 10,
 }
 
-OLLAMA_BASE_URL = os.getenv(
-    "OLLAMA_BASE_URL",
-    "http://localhost:11434",
-)
-
-OLLAMA_MODEL = os.getenv(
-    "OLLAMA_MODEL",
-    "qwen2.5:3b",
-)
+# Backward-compatible configuration exports.
+OLLAMA_BASE_URL = settings.ollama_base_url
+OLLAMA_MODEL = settings.ollama_model
