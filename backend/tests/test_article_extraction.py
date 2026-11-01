@@ -4,7 +4,7 @@ import httpx
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from app.services.article_extraction_service import (
+from app.services.article_extraction import (
     extract_article,
     extract_articles,
 )
@@ -45,7 +45,7 @@ async def test_extract_article_success(
     client.get.return_value = sample_response
 
     with patch(
-        "app.services.article_extraction_service.trafilatura.extract",
+        "app.services.article_extraction.trafilatura.extract",
         return_value=sample_article_text,
     ):
         result = await extract_article(sample_url, client)
@@ -131,7 +131,7 @@ async def test_extract_article_handles_missing_content(
     client.get.return_value = sample_response
 
     with patch(
-        "app.services.article_extraction_service.trafilatura.extract",
+        "app.services.article_extraction.trafilatura.extract",
         return_value=None,
     ):
         result = await extract_article(sample_url, client)
@@ -161,13 +161,13 @@ async def test_extract_articles_preserves_source_metadata(
     }
 
     with patch(
-        "app.services.article_extraction_service.httpx.AsyncClient"
+        "app.services.article_extraction.httpx.AsyncClient"
     ) as client_class:
         mock_client = AsyncMock()
         client_class.return_value.__aenter__.return_value = mock_client
 
         with patch(
-            "app.services.article_extraction_service.extract_article",
+            "app.services.article_extraction.extract_article",
             new_callable=AsyncMock,
             return_value=extraction_result,
         ):

@@ -7,9 +7,7 @@ import trafilatura
 
 logger = logging.getLogger(__name__)
 
-USER_AGENT = (
-    "Mozilla/5.0 (compatible; GlobalChessResearch/1.0)"
-)
+USER_AGENT = "ArgusCore/0.1"
 
 REQUEST_TIMEOUT = 20.0
 MAX_CONCURRENT_EXTRACTIONS = 5

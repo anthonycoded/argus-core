@@ -1,19 +1,14 @@
-
-import os
-from pathlib import Path
-
-from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
-# Load backend/.env regardless of the directory used to start Uvicorn.
-ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
-load_dotenv(ENV_FILE)
+from app.core.config import settings
 
-DATABASE_URL = os.getenv("DATABASE_URL")
+
+DATABASE_URL = settings.database_url
 
 if not DATABASE_URL:
     raise RuntimeError("DATABASE_URL is missing from backend/.env")
+
 
 engine = create_engine(
     DATABASE_URL,
