@@ -4,7 +4,7 @@ from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Always load the environment file from backend/.env.
-ENV_FILE = Path(__file__).resolve().parents[1] / ".env"
+ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
 
 
 class Settings(BaseSettings):
