@@ -7,7 +7,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 # Load backend/.env regardless of the directory used to start Uvicorn.
-ENV_FILE = Path(__file__).resolve().parents[1] / ".env"
+ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
 load_dotenv(ENV_FILE)
 
 DATABASE_URL = os.getenv("DATABASE_URL")
