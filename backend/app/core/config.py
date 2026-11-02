@@ -14,7 +14,7 @@ class Settings(BaseSettings):
 
     database_url: str | None = None
 
-    ollama_base_url: str = "http://localhost:11434"
+    ollama_base_url: str = "http://localhost:12400"
     ollama_model: str = "qwen2.5:3b"
 
     model_config = SettingsConfigDict(
