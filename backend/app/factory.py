@@ -1,4 +1,3 @@
-
 from collections.abc import Callable, Sequence
 from contextlib import asynccontextmanager
 
@@ -19,7 +18,6 @@ def create_app(
     async def lifespan(app: FastAPI):
         if initialize_database is not None:
             initialize_database()
-
         yield
 
     application = FastAPI(
