@@ -29,3 +29,16 @@ class SourceRegistrationRequest(BaseModel):
     published_at: datetime | None = None
     source_type: str = "unknown"
     metadata: dict[str, Any] = Field(default_factory=dict)
+
+class SourceRegistryResponse(BaseModel):
+    id: str
+    title: str
+    url: str
+    canonical_url: str
+    domain: str
+    content_hash: str | None = None
+    publisher: str | None = None
+    published_at: datetime | None = None
+    source_type: str
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    created_at: datetime

@@ -1,13 +1,19 @@
 from datetime import datetime, timezone
 from urllib.parse import urlsplit
 from sqlalchemy.orm import Session
+from sqlalchemy import Select
 from fastapi import APIRouter, Depends, HTTPException
 
-from app.api.v1.schemas import SourceRecord, SourceRegistrationRequest
+from app.core.database import get_db
+from app.core.models import SourceRecordDB
+
+from app.api.v1.schemas import SourceRecord, SourceRegistrationRequest, SourceRegistryResponse
+
 from app.utils.source_normalization import normalize_url
 from app.utils.deduplication import content_hash
-from app.core.database import get_db
+
 from app.services.source_registry import register_source
+
 
 router = APIRouter(
     prefix="/sources",
@@ -71,3 +77,30 @@ def register_source_endpoint(
             status_code=500,
             detail="Source registration failed.",
         ) from exc
+
+@router.get("/{source_id}", response_model=SourceRegistryResponse)
+def get_registered_source(
+    source_id: str,
+    db: Session = Depends(get_db),
+):
+    source = db.get(SourceRecordDB, source_id)
+
+    if source is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Source not found.",
+        )
+
+    return {
+        "id": source.id,
+        "title": source.title,
+        "url": source.url,
+        "canonical_url": source.canonical_url,
+        "domain": source.domain,
+        "content_hash": source.content_hash,
+        "publisher": source.publisher,
+        "published_at": source.published_at,
+        "source_type": source.source_type,
+        "metadata": source.metadata_json,
+        "created_at": source.created_at,
+    }
