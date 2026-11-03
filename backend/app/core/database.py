@@ -2,6 +2,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 from app.core.config import settings
+from app.core.models.base import CoreBase
 
 
 DATABASE_URL = settings.database_url
@@ -32,3 +33,8 @@ def get_db():
         yield db
     finally:
         db.close()
+
+def initialize_core_database() -> None:
+    from app.core.models import SourceRecordDB  # noqa: F401
+
+    CoreBase.metadata.create_all(bind=engine)
