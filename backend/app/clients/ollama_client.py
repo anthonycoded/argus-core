@@ -1,4 +1,3 @@
-
 import logging
 from typing import Any
 
@@ -58,7 +57,4 @@ class OllamaClient:
 
             response.raise_for_status()
 
-        payload = response.json()
-
-        return payload
-
+        return response.json()
