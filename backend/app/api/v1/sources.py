@@ -1,8 +1,8 @@
 from datetime import datetime, timezone
 from urllib.parse import urlsplit
 from sqlalchemy.orm import Session
-from sqlalchemy import Select
-from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import select, func
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.core.database import get_db
 from app.core.models import SourceRecordDB
@@ -103,4 +103,71 @@ def get_registered_source(
         "source_type": source.source_type,
         "metadata": source.metadata_json,
         "created_at": source.created_at,
+    }
+
+@router.get("")
+def list_registered_sources(
+    db: Session = Depends(get_db),
+    limit: int = Query(default=50, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    publisher: str | None = None,
+    source_type: str | None = None,
+    domain: str | None = None,
+    search: str | None = Query(default=None, min_length=1, max_length=200),
+):
+    statement = select(SourceRecordDB)
+    count_statement = select(func.count()).select_from(SourceRecordDB)
+
+    if publisher:
+        condition = SourceRecordDB.publisher.ilike(f"%{publisher}%")
+        statement = statement.where(condition)
+        count_statement = count_statement.where(condition)
+
+    if source_type:
+        condition = SourceRecordDB.source_type == source_type
+        statement = statement.where(condition)
+        count_statement = count_statement.where(condition)
+
+    if domain:
+        condition = SourceRecordDB.domain == domain.strip().lower()
+        statement = statement.where(condition)
+        count_statement = count_statement.where(condition)
+
+    if search:
+        condition = SourceRecordDB.title.ilike(f"%{search}%")
+        statement = statement.where(condition)
+        count_statement = count_statement.where(condition)
+
+    total = db.scalar(count_statement) or 0
+
+    statement = (
+        statement
+        .order_by(SourceRecordDB.created_at.desc())
+        .offset(offset)
+        .limit(limit)
+    )
+
+    sources = db.scalars(statement).all()
+
+    return {
+        "items": [
+            {
+                "id": source.id,
+                "title": source.title,
+                "url": source.url,
+                "canonical_url": source.canonical_url,
+                "domain": source.domain,
+                "content_hash": source.content_hash,
+                "publisher": source.publisher,
+                "published_at": source.published_at,
+                "source_type": source.source_type,
+                "metadata": source.metadata_json,
+                "created_at": source.created_at,
+            }
+            for source in sources
+        ],
+        "limit": limit,
+        "offset": offset,
+        "count": len(sources),
+        "total": total,
     }

@@ -64,3 +64,59 @@ def test_normalize_source_rejects_invalid_url():
     )
 
     assert response.status_code == 422
+
+def test_list_sources():
+    response = client.get("/api/v1/sources")
+
+    assert response.status_code == 200
+    data = response.json()
+
+    assert "items" in data
+    assert "limit" in data
+    assert "offset" in data
+    assert "count" in data
+
+
+def test_list_sources_with_pagination():
+    response = client.get("/api/v1/sources?limit=1&offset=0")
+
+    assert response.status_code == 200
+    data = response.json()
+
+    assert data["limit"] == 1
+    assert data["offset"] == 0
+    assert len(data["items"]) <= 1
+
+
+def test_list_sources_filter_by_publisher():
+    response = client.get("/api/v1/sources?publisher=Test Publisher")
+
+    assert response.status_code == 200
+    assert isinstance(response.json()["items"], list)
+
+
+def test_list_sources_filter_by_source_type():
+    response = client.get("/api/v1/sources?source_type=news")
+
+    assert response.status_code == 200
+    assert isinstance(response.json()["items"], list)
+
+
+def test_list_sources_filter_by_domain():
+    response = client.get("/api/v1/sources?domain=example.com")
+
+    assert response.status_code == 200
+    assert isinstance(response.json()["items"], list)
+
+
+def test_list_sources_search_by_title():
+    response = client.get("/api/v1/sources?search=Argus")
+
+    assert response.status_code == 200
+    assert isinstance(response.json()["items"], list)
+
+
+def test_list_sources_rejects_invalid_limit():
+    response = client.get("/api/v1/sources?limit=500")
+
+    assert response.status_code == 422
