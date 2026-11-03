@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 
@@ -30,6 +30,14 @@ class SourceRegistrationRequest(BaseModel):
     source_type: str = "unknown"
     metadata: dict[str, Any] = Field(default_factory=dict)
 
+    
+class SourceBatchRegistrationRequest(BaseModel):
+    sources: list[SourceRegistrationRequest] = Field(
+        min_length=1,
+        max_length=100,
+    )
+
+
 class SourceRegistryResponse(BaseModel):
     id: str
     title: str
@@ -42,3 +50,12 @@ class SourceRegistryResponse(BaseModel):
     source_type: str
     metadata: dict[str, Any] = Field(default_factory=dict)
     created_at: datetime
+
+    
+class SourceBatchRegistrationResponse(BaseModel):
+    status: Literal["completed", "completed_with_errors"]
+    total: int
+    created: int
+    duplicates: int
+    failed: int
+    results: list[dict[str, Any]] = Field(default_factory=list)

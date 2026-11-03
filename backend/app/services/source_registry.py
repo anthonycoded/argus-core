@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.core.models import SourceRecordDB
 from app.utils.deduplication import canonical_source_url, content_hash
+from app.api.v1.schemas import SourceRegistrationRequest
 
 
 def register_source(
@@ -95,4 +96,51 @@ def register_source(
         "source_id": source.id,
         "canonical_url": source.canonical_url,
         "content_hash": source.content_hash,
+    }
+
+
+def register_source_batch(db: Session, sources: list[dict]) -> dict:
+    results = []
+    created = 0
+    duplicates = 0
+    failed = 0
+
+    for source_data in sources:
+        try:
+            result = register_source(
+                db,
+                title=source_data["title"],
+                url=source_data["url"],
+                content=source_data.get("content"),
+                publisher=source_data.get("publisher"),
+                published_at=source_data.get("published_at"),
+                source_type=source_data.get("source_type", "unknown"),
+                metadata=source_data.get("metadata"),
+            )
+
+            if result["status"] == "created":
+                created += 1
+            elif result["status"] == "duplicate":
+                duplicates += 1
+
+            results.append(result)
+
+        except Exception:
+            db.rollback()
+            failed += 1
+            results.append({
+                "status": "failed",
+                "title": source_data.get("title"),
+                "reason": "Source registration failed.",
+            })
+
+    total = len(sources)
+
+    return {
+        "status": "completed_with_errors" if failed else "completed",
+        "total": total,
+        "created": created,
+        "duplicates": duplicates,
+        "failed": failed,
+        "results": results,
     }

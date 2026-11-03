@@ -7,12 +7,17 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from app.core.database import get_db
 from app.core.models import SourceRecordDB
 
-from app.api.v1.schemas import SourceRecord, SourceRegistrationRequest, SourceRegistryResponse
+from app.api.v1.schemas import (
+    SourceRecord, 
+    SourceRegistrationRequest, 
+    SourceRegistryResponse,   
+    SourceBatchRegistrationRequest, 
+    SourceBatchRegistrationResponse)
 
 from app.utils.source_normalization import normalize_url
 from app.utils.deduplication import content_hash
 
-from app.services.source_registry import register_source
+from app.services.source_registry import register_source, register_source_batch
 
 
 router = APIRouter(
@@ -77,6 +82,25 @@ def register_source_endpoint(
             status_code=500,
             detail="Source registration failed.",
         ) from exc
+
+
+@router.post(
+    "/register/batch",
+    response_model=SourceBatchRegistrationResponse,
+)
+def register_source_batch_endpoint(
+    request: SourceBatchRegistrationRequest,
+    db: Session = Depends(get_db),
+):
+    sources = []
+
+    for source in request.sources:
+        source_data = source.model_dump()
+        source_data["url"] = str(source.url)
+        sources.append(source_data)
+
+    return register_source_batch(db, sources)
+
 
 @router.get("/{source_id}", response_model=SourceRegistryResponse)
 def get_registered_source(

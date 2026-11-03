@@ -5,8 +5,10 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app.core.models import CoreBase, SourceRecordDB
-from app.services.source_registry import register_source
-
+from app.services.source_registry import (
+    register_source,
+    register_source_batch,
+)
 
 @pytest.fixture
 def db_session():
@@ -104,3 +106,76 @@ def test_persist_source_across_sessions(db_session):
 
     assert saved is not None
     assert saved.title == "Persistent article"
+
+    
+def test_register_source_batch(db_session):
+    sources = [
+        {
+            "title": "Ukraine update",
+            "url": "https://example.com/ukraine",
+            "content": "Ukraine article content.",
+            "publisher": "Example News",
+            "source_type": "news",
+        },
+        {
+            "title": "Iran update",
+            "url": "https://example.com/iran",
+            "content": "Iran article content.",
+            "publisher": "Example News",
+            "source_type": "news",
+        },
+    ]
+
+    result = register_source_batch(db_session, sources)
+
+    assert result["status"] == "completed"
+    assert result["total"] == 2
+    assert result["created"] == 2
+    assert result["duplicates"] == 0
+    assert result["failed"] == 0
+    assert len(result["results"]) == 2
+
+
+def test_register_source_batch_detects_duplicates(db_session):
+    sources = [
+        {
+            "title": "First article",
+            "url": "https://example.com/article",
+        },
+        {
+            "title": "Duplicate article",
+            "url": "https://example.com/article?utm_source=test",
+        },
+    ]
+
+    result = register_source_batch(db_session, sources)
+
+    assert result["status"] == "completed"
+    assert result["total"] == 2
+    assert result["created"] == 1
+    assert result["duplicates"] == 1
+    assert result["failed"] == 0
+
+
+def test_register_source_batch_handles_individual_failures(db_session):
+    sources = [
+        {
+            "title": "Valid article",
+            "url": "https://example.com/valid",
+        },
+        {
+            "url": "https://example.com/invalid",
+        },
+        {
+            "title": "Another valid article",
+            "url": "https://example.com/another",
+        },
+    ]
+
+    result = register_source_batch(db_session, sources)
+
+    assert result["status"] == "completed_with_errors"
+    assert result["total"] == 3
+    assert result["created"] == 2
+    assert result["duplicates"] == 0
+    assert result["failed"] == 1
