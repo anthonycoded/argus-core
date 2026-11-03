@@ -6,7 +6,7 @@ from fastapi import HTTPException
 from pydantic import BaseModel, Field
 
 from typing import Literal
-from app.services.ollama_client import OllamaClient
+from app.clients.ollama_client import OllamaClient
 from app.schemas import StoryAnalysisResult
 
 logging.basicConfig(level=logging.INFO)
