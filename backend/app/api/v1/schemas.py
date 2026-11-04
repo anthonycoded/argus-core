@@ -52,10 +52,20 @@ class SourceRegistryResponse(BaseModel):
     created_at: datetime
 
     
+class SourceBatchResult(BaseModel):
+    status: Literal["created", "duplicate", "failed"]
+    title: str | None = None
+    source_id: str | None = None
+    canonical_url: str | None = None
+    content_hash: str | None = None
+    reason: str | None = None
+
+
 class SourceBatchRegistrationResponse(BaseModel):
     status: Literal["completed", "completed_with_errors"]
     total: int
     created: int
     duplicates: int
     failed: int
-    results: list[dict[str, Any]] = Field(default_factory=list)
+    results: list[SourceBatchResult] = Field(default_factory=list)
+    

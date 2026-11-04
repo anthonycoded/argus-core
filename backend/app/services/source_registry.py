@@ -5,8 +5,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.models import SourceRecordDB
-from app.utils.deduplication import canonical_source_url, content_hash
-from app.api.v1.schemas import SourceRegistrationRequest
+from app.utils.deduplication import canonical_source_url, content_hash, source_domain
 
 
 def register_source(
@@ -23,6 +22,7 @@ def register_source(
     """Register a source and detect existing URL or content duplicates."""
 
     canonical_url = canonical_source_url(url)
+    fingerprint = content_hash(content) if content else None
 
     existing = db.scalar(
         select(SourceRecordDB).where(
@@ -37,8 +37,6 @@ def register_source(
             "source_id": existing.id,
             "canonical_url": existing.canonical_url,
         }
-
-    fingerprint = content_hash(content) if content else None
 
     if fingerprint:
         existing = db.scalar(
@@ -59,7 +57,7 @@ def register_source(
         title=title,
         url=url,
         canonical_url=canonical_url,
-        domain=canonical_url.split("/")[2],
+        domain=source_domain(canonical_url),
         content_hash=fingerprint,
         publisher=publisher,
         published_at=published_at,
@@ -72,19 +70,40 @@ def register_source(
     try:
         db.commit()
         db.refresh(source)
-    except IntegrityError:
+
+    except IntegrityError as exc:
         db.rollback()
+
+        original_error = exc.orig
+        constraint_name = getattr(
+            getattr(original_error, "diag", None),
+            "constraint_name",
+            None,
+        )
+
+        if constraint_name == "uq_core_sources_canonical_url":
+            duplicate_reason = "canonical_url"
+            lookup_column = SourceRecordDB.canonical_url
+            lookup_value = canonical_url
+
+        elif constraint_name == "uq_core_sources_content_hash":
+            duplicate_reason = "content_hash"
+            lookup_column = SourceRecordDB.content_hash
+            lookup_value = fingerprint
+
+        else:
+            raise
 
         existing = db.scalar(
             select(SourceRecordDB).where(
-                SourceRecordDB.canonical_url == canonical_url
+                lookup_column == lookup_value
             )
         )
 
         if existing:
             return {
                 "status": "duplicate",
-                "reason": "canonical_url",
+                "reason": duplicate_reason,
                 "source_id": existing.id,
                 "canonical_url": existing.canonical_url,
             }
@@ -125,13 +144,22 @@ def register_source_batch(db: Session, sources: list[dict]) -> dict:
 
             results.append(result)
 
+        except (KeyError, TypeError, ValueError) as exc:
+            db.rollback()
+            failed += 1
+            results.append({
+                "status": "failed",
+                "title": source_data.get("title"),
+                "reason": str(exc),
+            })
+
         except Exception:
             db.rollback()
             failed += 1
             results.append({
                 "status": "failed",
                 "title": source_data.get("title"),
-                "reason": "Source registration failed.",
+                "reason": "Source registration failed due to an internal error.",
             })
 
     total = len(sources)

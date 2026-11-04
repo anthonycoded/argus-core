@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from sqlalchemy import DateTime, Index, JSON, String, Text, UniqueConstraint
+from sqlalchemy import DateTime, Index, JSON, String, Text, UniqueConstraint, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.models.base import CoreBase
@@ -71,10 +71,12 @@ class SourceRecordDB(CoreBase):
     )
 
     __table_args__ = (
-        UniqueConstraint(
-            "canonical_url",
-            name="uq_core_sources_canonical_url",
+        UniqueConstraint("canonical_url", name="uq_core_sources_canonical_url"),
+        Index(
+            "uq_core_sources_content_hash",
+            "content_hash",
+            unique=True,
+            postgresql_where=text("content_hash IS NOT NULL"),
         ),
-        Index("ix_core_sources_content_hash", "content_hash"),
         Index("ix_core_sources_domain", "domain"),
     )
