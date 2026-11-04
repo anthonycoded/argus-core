@@ -13,16 +13,36 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Use only Argus-Core models, excluding Global Chess models.
+# Argus-Core owns only the tables registered in CoreBase.
 target_metadata = CoreBase.metadata
 
-# Load the database URL from the existing application settings.
+
+def include_object(
+    object,
+    name,
+    type_,
+    reflected,
+    compare_to,
+):
+    """Restrict Alembic migrations to Argus-Core-owned tables."""
+
+    if type_ == "table":
+        return name in target_metadata.tables
+
+    if type_ == "column":
+        table = object.table
+
+        if table.name not in target_metadata.tables:
+            return False
+
+    return True
+
+
 database_url = settings.database_url
 
 if not database_url:
     raise RuntimeError("DATABASE_URL is missing from the Argus-Core environment.")
 
-# Escape percent characters for ConfigParser interpolation.
 config.set_main_option(
     "sqlalchemy.url",
     database_url.replace("%", "%%"),
@@ -30,14 +50,13 @@ config.set_main_option(
 
 
 def run_migrations_offline() -> None:
-    url = database_url
-
     context.configure(
-        url=url,
+        url=database_url,
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
         compare_type=True,
+        include_object=include_object,
     )
 
     with context.begin_transaction():
@@ -56,6 +75,7 @@ def run_migrations_online() -> None:
             connection=connection,
             target_metadata=target_metadata,
             compare_type=True,
+            include_object=include_object,
         )
 
         with context.begin_transaction():
