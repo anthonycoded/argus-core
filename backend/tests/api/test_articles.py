@@ -6,6 +6,12 @@ from fastapi.testclient import TestClient
 
 from app.api.v1.router import api_router
 from app.core.auth import AuthenticatedApplication, get_current_application
+from app.core.rate_limit import require_rate_limit
+
+from app.services.rate_limiter import (
+    GENERAL_API_LIMIT,
+    ARTICLE_EXTRACTION_LIMIT,
+)
 from app.factory import create_app
 
 
@@ -31,6 +37,20 @@ def client():
     test_app.dependency_overrides[get_current_application] = (
         lambda: test_auth
     )
+
+    test_app.dependency_overrides[
+        require_rate_limit(
+            bucket="general",
+            rate_limit=GENERAL_API_LIMIT,
+        )
+    ] = lambda: test_auth
+
+    test_app.dependency_overrides[
+        require_rate_limit(
+            bucket="article_extraction",
+            rate_limit=ARTICLE_EXTRACTION_LIMIT,
+        )
+    ] = lambda: test_auth
 
     with TestClient(test_app) as test_client:
         yield test_client
