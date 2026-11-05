@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta, timezone
 
 import pytest
-
+from starlette.requests import Request
 from fastapi import HTTPException
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -62,11 +62,20 @@ def registered_key(db):
 
     return application, api_key, generated.plaintext_key
 
+@pytest.fixture
+def mock_request():
+    return Request({
+        "type": "http",
+        "method": "GET",
+        "path": "/api/v1/test",
+        "headers": [],
+    })
 
-def test_authenticate_valid_api_key(db, registered_key):
+def test_authenticate_valid_api_key(db, registered_key, mock_request):
     application, api_key, plaintext = registered_key
 
     result = get_current_application(
+        request=mock_request,
         x_api_key=plaintext,
         db=db,
     )
@@ -79,6 +88,7 @@ def test_authenticate_valid_api_key(db, registered_key):
 def test_reject_missing_api_key(db):
     with pytest.raises(HTTPException) as exc:
         get_current_application(
+            request=mock_request,
             x_api_key=None,
             db=db,
         )
@@ -89,6 +99,7 @@ def test_reject_missing_api_key(db):
 def test_reject_invalid_api_key(db):
     with pytest.raises(HTTPException) as exc:
         get_current_application(
+            request=mock_request,
             x_api_key="argus_live_invalid_secret",
             db=db,
         )
@@ -104,6 +115,7 @@ def test_reject_revoked_api_key(db, registered_key):
 
     with pytest.raises(HTTPException) as exc:
         get_current_application(
+            request=mock_request,
             x_api_key=plaintext,
             db=db,
         )
@@ -119,6 +131,7 @@ def test_reject_inactive_application(db, registered_key):
 
     with pytest.raises(HTTPException) as exc:
         get_current_application(
+            request=mock_request,
             x_api_key=plaintext,
             db=db,
         )
@@ -134,6 +147,7 @@ def test_reject_expired_api_key(db, registered_key):
 
     with pytest.raises(HTTPException) as exc:
         get_current_application(
+            request=mock_request,
             x_api_key=plaintext,
             db=db,
         )
@@ -141,12 +155,13 @@ def test_reject_expired_api_key(db, registered_key):
     assert exc.value.status_code == 401
 
 
-def test_update_last_used_timestamp(db, registered_key):
+def test_update_last_used_timestamp(db, registered_key, mock_request):
     _, api_key, plaintext = registered_key
 
     assert api_key.last_used_at is None
 
     get_current_application(
+        request=mock_request,
         x_api_key=plaintext,
         db=db,
     )

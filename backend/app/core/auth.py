@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
-from fastapi import Depends, Header, HTTPException, status
+from fastapi import Depends, Header, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -22,6 +22,7 @@ class AuthenticatedApplication:
 
 
 def get_current_application(
+    request: Request,
     x_api_key: str | None = Header(default=None, alias="X-API-Key"),
     db: Session = Depends(get_db),
 ) -> AuthenticatedApplication:
@@ -74,6 +75,9 @@ def get_current_application(
 
     api_key.last_used_at = now
     db.commit()
+
+    request.state.audit_application_id = application.id
+    request.state.audit_api_key_id = api_key.id
 
     return AuthenticatedApplication(
         application=application,
