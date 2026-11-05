@@ -6,6 +6,11 @@ from pydantic import BaseModel, Field
 
 from app.clients.ollama_client import OllamaClient
 from app.core.permissions import require_scopes
+from app.core.rate_limit import require_rate_limit
+from app.services.rate_limiter import (
+    GENERAL_API_LIMIT,
+    AI_GENERATION_LIMIT,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +34,18 @@ class AIRequest(BaseModel):
 async def generate_ai_response(
     request: AIRequest,
     _auth=Depends(require_scopes("ai:generate")),
+    _general_limit=Depends(
+        require_rate_limit(
+            bucket="general",
+            rate_limit=GENERAL_API_LIMIT,
+        )
+    ),
+    _ai_limit=Depends(
+        require_rate_limit(
+            bucket="ai_generation",
+            rate_limit=AI_GENERATION_LIMIT,
+        )
+    ),
 ):
     try:
         payload = await ollama_client.generate_structured(
