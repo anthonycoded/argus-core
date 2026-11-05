@@ -1,17 +1,31 @@
 
 from datetime import datetime, timezone
-
 import pytest
+from types import SimpleNamespace
 from fastapi.testclient import TestClient
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app.api.v1.router import api_router
+
 from app.core.database import get_db
 from app.core.models import CoreBase, SourceRecordDB
+from app.core.auth import AuthenticatedApplication, get_current_application
+
 from app.factory import create_app
 
+test_auth = AuthenticatedApplication(
+    application=SimpleNamespace(
+        id="test-application",
+        slug="test-application",
+    ),
+    api_key=SimpleNamespace(
+        id="test-api-key",
+        scopes=["sources:read", "sources:write"],
+    ),
+)
 
 @pytest.fixture
 def test_session_factory():
@@ -50,6 +64,7 @@ def client(test_session_factory):
             db.close()
 
     test_app.dependency_overrides[get_db] = override_get_db
+    test_app.dependency_overrides[get_current_application] = lambda: test_auth
 
     with TestClient(test_app) as test_client:
         yield test_client

@@ -4,15 +4,16 @@ from sqlalchemy.orm import Session
 from sqlalchemy import select, func
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from app.core.database import get_db
-from app.core.models import SourceRecordDB
-
 from app.api.v1.schemas import (
     SourceRecord, 
     SourceRegistrationRequest, 
     SourceRegistryResponse,   
     SourceBatchRegistrationRequest, 
     SourceBatchRegistrationResponse)
+
+from app.core.database import get_db
+from app.core.models import SourceRecordDB
+from app.core.permissions import require_scopes
 
 from app.utils.source_normalization import normalize_url
 from app.utils.deduplication import content_hash
@@ -30,6 +31,7 @@ router = APIRouter(
 def normalize_source(
     request: SourceRecord,
     content: str | None = None,
+    _auth=Depends(require_scopes("sources:write")),
 ):
     normalized_url = normalize_url(str(request.url))
 
@@ -63,6 +65,7 @@ def normalize_source(
 def register_source_endpoint(
     request: SourceRegistrationRequest,
     db: Session = Depends(get_db),
+    _auth=Depends(require_scopes("sources:write")),
 ):
     try:
         return register_source(
@@ -91,6 +94,7 @@ def register_source_endpoint(
 def register_source_batch_endpoint(
     request: SourceBatchRegistrationRequest,
     db: Session = Depends(get_db),
+    _auth=Depends(require_scopes("sources:write")),
 ):
     sources = []
 
@@ -106,6 +110,7 @@ def register_source_batch_endpoint(
 def get_registered_source(
     source_id: str,
     db: Session = Depends(get_db),
+    _auth=Depends(require_scopes("sources:read")),
 ):
     source = db.get(SourceRecordDB, source_id)
 
@@ -138,6 +143,7 @@ def list_registered_sources(
     source_type: str | None = None,
     domain: str | None = None,
     search: str | None = Query(default=None, min_length=1, max_length=200),
+    _auth=Depends(require_scopes("sources:read")),
 ):
     statement = select(SourceRecordDB)
     count_statement = select(func.count()).select_from(SourceRecordDB)
