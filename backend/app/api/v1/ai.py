@@ -1,11 +1,11 @@
 import logging
 from typing import Any
-
 import httpx
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
 
 from app.clients.ollama_client import OllamaClient
+from app.core.permissions import require_scopes
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +26,10 @@ class AIRequest(BaseModel):
 
 
 @router.post("/generate")
-async def generate_ai_response(request: AIRequest):
+async def generate_ai_response(
+    request: AIRequest,
+    _auth=Depends(require_scopes("ai:generate")),
+):
     try:
         payload = await ollama_client.generate_structured(
             system_prompt=request.system_prompt,
