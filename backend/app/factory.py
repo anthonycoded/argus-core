@@ -1,4 +1,4 @@
-from collections.abc import Callable, Sequence
+from collections.abc import Awaitable, Callable, Sequence
 from contextlib import asynccontextmanager
 
 from fastapi import APIRouter, FastAPI
@@ -12,13 +12,18 @@ def create_app(
     version: str | None = None,
     routers: Sequence[APIRouter] = (),
     initialize_database: Callable[[], None] | None = None,
+    on_shutdown: Callable[[], Awaitable[None]] | None = None,
 ) -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
-        if initialize_database is not None:
-            initialize_database()
-        yield
+        try:
+            if initialize_database is not None:
+                initialize_database()
+            yield
+        finally:
+            if on_shutdown is not None:
+                await on_shutdown()
 
     application = FastAPI(
         title=title or settings.app_name,

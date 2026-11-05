@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     environment: str = "development"
 
     database_url: str | None = None
+    redis_url: str = "redis://127.0.0.1:6379/0"
 
     ollama_base_url: str = "http://localhost:12400"
     ollama_model: str = "qwen2.5:3b"
