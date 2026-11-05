@@ -1,6 +1,28 @@
+from types import SimpleNamespace
+
 from fastapi.testclient import TestClient
 
+from app.core.auth import AuthenticatedApplication, get_current_application
 from app.core_main import app
+
+
+test_auth = AuthenticatedApplication(
+    application=SimpleNamespace(
+        id="test-application",
+        slug="test-application",
+    ),
+    api_key=SimpleNamespace(
+        id="test-api-key",
+        scopes=[
+            "sources:read",
+            "sources:write",
+        ],
+    ),
+)
+
+app.dependency_overrides[get_current_application] = (
+    lambda: test_auth
+)
 
 client = TestClient(app)
 
