@@ -6,7 +6,11 @@ from sqlalchemy import engine_from_config, pool
 
 from app.core.config import settings
 from app.core.models.base import CoreBase
-from app.core.models import SourceRecordDB  # noqa: F401
+from app.core.models import (
+    APIKeyDB,
+    ApplicationDB,
+    SourceRecordDB,
+)  # noqa: F401
 
 config = context.config
 
