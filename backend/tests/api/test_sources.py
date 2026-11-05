@@ -2,9 +2,11 @@ from types import SimpleNamespace
 
 from fastapi.testclient import TestClient
 
-from app.core.auth import AuthenticatedApplication, get_current_application
-from app.core_main import app
 
+from app.core_main import app
+from app.core.auth import AuthenticatedApplication, get_current_application
+from app.core.rate_limit import require_rate_limit
+from app.services.rate_limiter import GENERAL_API_LIMIT
 
 test_auth = AuthenticatedApplication(
     application=SimpleNamespace(
@@ -23,6 +25,13 @@ test_auth = AuthenticatedApplication(
 app.dependency_overrides[get_current_application] = (
     lambda: test_auth
 )
+
+app.dependency_overrides[
+    require_rate_limit(
+        bucket="general",
+        rate_limit=GENERAL_API_LIMIT,
+    )
+] = lambda: test_auth
 
 client = TestClient(app)
 

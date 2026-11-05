@@ -14,12 +14,16 @@ from app.api.v1.schemas import (
 from app.core.database import get_db
 from app.core.models import SourceRecordDB
 from app.core.permissions import require_scopes
+from app.core.rate_limit import require_rate_limit
 
 from app.utils.source_normalization import normalize_url
 from app.utils.deduplication import content_hash
 
 from app.services.source_registry import register_source, register_source_batch
-
+from app.services.rate_limiter import (
+    GENERAL_API_LIMIT,
+    SOURCE_WRITE_LIMIT,
+)
 
 router = APIRouter(
     prefix="/sources",
@@ -32,6 +36,12 @@ def normalize_source(
     request: SourceRecord,
     content: str | None = None,
     _auth=Depends(require_scopes("sources:write")),
+    _general_limit=Depends(
+        require_rate_limit(
+            bucket="general",
+            rate_limit=GENERAL_API_LIMIT,
+        )
+    ),
 ):
     normalized_url = normalize_url(str(request.url))
 
@@ -66,6 +76,18 @@ def register_source_endpoint(
     request: SourceRegistrationRequest,
     db: Session = Depends(get_db),
     _auth=Depends(require_scopes("sources:write")),
+    _general_limit=Depends(
+        require_rate_limit(
+            bucket="general",
+            rate_limit=GENERAL_API_LIMIT,
+        ),
+    ),
+    _source_limit=Depends(
+        require_rate_limit(
+            bucket="source_write",
+            rate_limit=SOURCE_WRITE_LIMIT,
+        )
+    ),
 ):
     try:
         return register_source(
@@ -95,6 +117,18 @@ def register_source_batch_endpoint(
     request: SourceBatchRegistrationRequest,
     db: Session = Depends(get_db),
     _auth=Depends(require_scopes("sources:write")),
+    _general_limit=Depends(
+        require_rate_limit(
+            bucket="general",
+            rate_limit=GENERAL_API_LIMIT,
+        )
+    ),
+    _source_limit=Depends(
+        require_rate_limit(
+            bucket="source_write",
+            rate_limit=SOURCE_WRITE_LIMIT,
+        )
+    ),
 ):
     sources = []
 
@@ -111,6 +145,12 @@ def get_registered_source(
     source_id: str,
     db: Session = Depends(get_db),
     _auth=Depends(require_scopes("sources:read")),
+    _general_limit=Depends(
+        require_rate_limit(
+            bucket="general",
+            rate_limit=GENERAL_API_LIMIT,
+        )
+    ),
 ):
     source = db.get(SourceRecordDB, source_id)
 
@@ -144,6 +184,12 @@ def list_registered_sources(
     domain: str | None = None,
     search: str | None = Query(default=None, min_length=1, max_length=200),
     _auth=Depends(require_scopes("sources:read")),
+    _general_limit=Depends(
+        require_rate_limit(
+            bucket="general",
+            rate_limit=GENERAL_API_LIMIT,
+        )
+    ),
 ):
     statement = select(SourceRecordDB)
     count_statement = select(func.count()).select_from(SourceRecordDB)

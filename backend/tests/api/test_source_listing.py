@@ -13,6 +13,8 @@ from app.api.v1.router import api_router
 from app.core.database import get_db
 from app.core.models import CoreBase, SourceRecordDB
 from app.core.auth import AuthenticatedApplication, get_current_application
+from app.core.rate_limit import require_rate_limit
+from app.services.rate_limiter import GENERAL_API_LIMIT
 
 from app.factory import create_app
 
@@ -65,6 +67,12 @@ def client(test_session_factory):
 
     test_app.dependency_overrides[get_db] = override_get_db
     test_app.dependency_overrides[get_current_application] = lambda: test_auth
+    test_app.dependency_overrides[
+        require_rate_limit(
+            bucket="general",
+            rate_limit=GENERAL_API_LIMIT,
+        )
+    ] = lambda: test_auth
 
     with TestClient(test_app) as test_client:
         yield test_client

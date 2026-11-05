@@ -1,3 +1,5 @@
+from functools import lru_cache
+
 from fastapi import Depends, HTTPException, Response, status
 
 from app.core.auth import (
@@ -10,6 +12,7 @@ from app.services.rate_limiter import (
 )
 
 
+@lru_cache(maxsize=None)
 def require_rate_limit(
     *,
     bucket: str,
