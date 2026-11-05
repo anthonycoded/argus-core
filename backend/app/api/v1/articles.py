@@ -1,8 +1,9 @@
 import logging
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, HttpUrl
 
+from app.core.permissions import require_scopes
 from app.services.article_extraction import extract_articles
 
 logger = logging.getLogger(__name__)
@@ -20,6 +21,7 @@ class ArticleExtractionRequest(BaseModel):
 @router.post("/extract")
 async def extract_article_endpoint(
     request: ArticleExtractionRequest,
+    _auth=Depends(require_scopes("articles:extract")),
 ):
     try:
         results = await extract_articles(

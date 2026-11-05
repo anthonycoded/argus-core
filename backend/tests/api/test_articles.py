@@ -1,13 +1,42 @@
+import pytest
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 from fastapi.testclient import TestClient
 
-from app.core_main import app
+from app.api.v1.router import api_router
+from app.core.auth import AuthenticatedApplication, get_current_application
+from app.factory import create_app
 
-client = TestClient(app)
+
+@pytest.fixture
+def client():
+    test_app = create_app(
+        title="Argus-Core Test",
+        version="test",
+        routers=(api_router,),
+    )
+
+    test_auth = AuthenticatedApplication(
+        application=SimpleNamespace(
+            id="test-application",
+            slug="test-application",
+        ),
+        api_key=SimpleNamespace(
+            id="test-api-key",
+            scopes=["articles:extract"],
+        ),
+    )
+
+    test_app.dependency_overrides[get_current_application] = (
+        lambda: test_auth
+    )
+
+    with TestClient(test_app) as test_client:
+        yield test_client
 
 
-def test_article_extraction_success():
+def test_article_extraction_success(client):
     extraction_result = {
         "url": "https://example.com/article",
         "extraction_status": "success",
@@ -32,7 +61,7 @@ def test_article_extraction_success():
     )
 
 
-def test_article_extraction_invalid_url():
+def test_article_extraction_invalid_url(client):
     response = client.post(
         "/api/v1/articles/extract",
         json={"url": "not-a-valid-url"},
