@@ -1,5 +1,6 @@
 from functools import lru_cache
-
+import logging
+from redis.exceptions import RedisError
 from fastapi import Depends, HTTPException, Response, status
 
 from app.core.auth import (
@@ -11,6 +12,7 @@ from app.services.rate_limiter import (
     enforce_rate_limit,
 )
 
+logger = logging.getLogger(__name__)
 
 @lru_cache(maxsize=None)
 def require_rate_limit(
@@ -25,12 +27,22 @@ def require_rate_limit(
         ),
     ) -> AuthenticatedApplication:
 
-        decision = await enforce_rate_limit(
-            application_id=auth.application.id,
-            api_key_id=auth.api_key.id,
-            bucket=bucket,
-            rate_limit=rate_limit,
-        )
+        try:
+            decision = await enforce_rate_limit(
+                application_id=auth.application.id,
+                api_key_id=auth.api_key.id,
+                bucket=bucket,
+                rate_limit=rate_limit,
+            )
+
+        except RedisError as exc:
+            logger.exception("Redis rate limiter unavailable")
+
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Rate limiting service unavailable. Please try again later.",
+                headers={"Retry-After": "5"},
+            ) from exc
 
         headers = {
             "X-RateLimit-Limit": str(decision.limit),

@@ -9,6 +9,7 @@ from app.core.auth import AuthenticatedApplication
 from app.core.rate_limit import require_rate_limit
 from app.services.rate_limiter import RateLimit, RateLimitDecision
 
+from redis.exceptions import ConnectionError
 
 @pytest.fixture
 def test_auth():
@@ -88,3 +89,42 @@ def test_rate_limit_returns_429_when_exceeded(test_auth):
     assert response.json()["detail"] == (
         "Rate limit exceeded. Please try again later."
     )
+
+def test_rate_limit_returns_503_when_redis_unavailable(test_auth):
+    app = FastAPI()
+
+    async def mock_enforce_rate_limit(**kwargs):
+        raise ConnectionError("Redis unavailable")
+
+    from app.core import rate_limit as rate_limit_module
+
+    rate_limit_module.enforce_rate_limit = mock_enforce_rate_limit
+
+    async def override_auth():
+        return test_auth
+
+    app.dependency_overrides[
+        rate_limit_module.get_current_application
+    ] = override_auth
+
+    app.get("/test")(
+        lambda auth=Depends(
+            require_rate_limit(
+                bucket="test",
+                rate_limit=RateLimit(
+                    requests=5,
+                    window_seconds=60,
+                ),
+            )
+        ): {"status": "ok"}
+    )
+
+    with TestClient(app) as client:
+        response = client.get("/test")
+
+    assert response.status_code == 503
+    assert response.headers["Retry-After"] == "5"
+    assert response.json()["detail"] == (
+        "Rate limiting service unavailable. Please try again later."
+    )
+    
