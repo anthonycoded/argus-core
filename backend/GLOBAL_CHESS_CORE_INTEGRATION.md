@@ -12,7 +12,7 @@ The client and its settings belong to Global Chess and import no Core settings,
 database models or internal services. Existing packages, tables and editorial
 prompts remain in place. `analyze_topic_with_ollama` retains its legacy import name,
 but topic analysis never calls its module's direct Ollama client. Classification,
-GDELT discovery and ingestion retain their existing paths. RSS and Google News research
+GDELT discovery retains its existing path. RSS ingestion and RSS/Google News research
 discovery use Core HTTP as described below. Research inference uses
 `services/research_inference.py` for input-limit and Pydantic validation.
 
@@ -102,8 +102,8 @@ and other research configuration remain coupled until later separation milestone
 `generate_research_plan`, `evaluate_research_progress`, `synthesize_research`, and
 `run_research_agent` accept an optional keyword-only `inference_client`. Default
 calls use the same server-side settings and authenticated adapter as topic analysis.
-There is no direct-Ollama fallback. GDELT discovery, ingestion, and relevance
-classification retain their existing provider paths. RSS and Google News research use Core.
+There is no direct-Ollama fallback. GDELT discovery and relevance
+classification retain their existing provider paths. RSS ingestion and RSS/Google News research use Core.
 
 Planning keeps temperature 0.2 and a 120-second inference timeout; evaluation keeps
 temperature 0 and 120 seconds; synthesis keeps temperature 0 and 180 seconds.
@@ -221,10 +221,11 @@ limits. Relevance classification retains its existing provider behavior.
 
 Research now uses `CoreDiscoveryClient.discover_rss(feed_id=...)`, authenticated with
 the existing server-side key, which must have `discovery:read`. It never parses or
-fetches RSS locally and has no direct-provider fallback. Ingestion is unchanged.
+fetches RSS locally and has no direct-provider fallback. Ingestion now uses the same
+authenticated client with its own approved-feed mapping; see INGESTION_CHARACTERIZATION.md.
 `global_chess_config.RESEARCH_RSS_FEEDS` maps BBC World to `bbc-world` and NPR
-Politics to `npr-politics`, in that order. Ingestion's separate URL configuration
-is untouched. These identifiers must remain approved/enabled on the Core server.
+Politics to `npr-politics`, in that order. Ingestion's approved-ID mapping is independently configured; its legacy URL
+exports remain for compatibility. These identifiers must remain approved/enabled on the Core server.
 
 The Global Chess-owned `clients/rss_discovery_contracts.py` validates the wire
 response independently of Core internals. Each request uses provider `rss`, one
@@ -272,3 +273,15 @@ Snapshot TTL is five minutes; concurrency, quotas or delays may cause explicit e
 application/key quotas and job/proxy timeouts operationally; this change neither
 weakens quotas nor silently drops evidence to fit them. Metadata remains transient
 because the existing research table has no provenance column.
+
+## RSS topic ingestion
+
+`POST /ingest` now collects complete Core RSS snapshots before a synchronous worker
+persists Topics. The adapter keeps ordered duplicate observations and provenance;
+the Global Chess writer preserves scoring, labels, last-valid-observation winners,
+distinct counters, editorial status/summary and the final transaction. Feed errors
+remain HTTP 200 in the original body; they are sanitized and explicitly report
+incomplete/expired/failed coverage, retaining accepted partial entries. Retry-After
+guidance is validated and included per feed, without retries. No direct RSS fallback
+exists. Provenance is transient under the existing Topic schema. See
+INGESTION_CHARACTERIZATION.md for strict-parser/date compatibility changes and limits.

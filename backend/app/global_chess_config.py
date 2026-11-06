@@ -19,7 +19,10 @@ class GlobalChessSettings(BaseSettings):
     )
 
 
-# Research uses approved Core identifiers. Ingestion's URL registry stays separate.
+# Research's approved Core identifiers remain independently owned.
 RESEARCH_RSS_FEEDS = (("BBC World", "bbc-world"), ("NPR Politics", "npr-politics"))
+
+# Independent ingestion ownership; keep the legacy labels and traversal order.
+INGESTION_RSS_FEEDS = (("BBC World", "bbc-world"), ("NPR Politics", "npr-politics"))
 
 global_chess_settings = GlobalChessSettings()

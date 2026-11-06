@@ -1,15 +1,15 @@
 # Global Chess RSS topic ingestion: current behavior
 
-This characterizes ingestion before replacing network retrieval, including its
-request-local duplicate-URL repair. Only deduplication changed in ingestion;
-retrieval, scoring, ORM, schema, migration and startup behavior remain unchanged.
-The tests retain the original behavior coverage and now prevent the duplicate bug.
+RSS retrieval now uses the existing Global Chess-owned authenticated Core client.
+Editorial scoring and Topic persistence remain in Global Chess. Request-local URL
+deduplication, distinct counters, the response body and final commit/rollback are
+preserved; Core contracts, research, Google News, GDELT and schemas are unchanged.
 
 ## HTTP contract and ownership
 
-Global Chess registers synchronous `POST /ingest` in [main.py](app/main.py).
+Global Chess registers asynchronous `POST /ingest` in [main.py](app/main.py).
 [ingestion.py](app/routes/ingestion.py) declares no body, query parameters,
-authentication dependency, scope or rate limit. A supplied body/query is ignored;
+caller-authentication dependency, scope or rate limit. A supplied body/query is ignored;
 GET returns 405. The Core application does not register this route. Global Chess's
 factory currently has no Core request-audit middleware configured.
 
@@ -19,9 +19,12 @@ Normal responses are HTTP 200, including partial or total feed failure:
 {"inserted": 2, "updated": 0, "feed_errors": []}
 ```
 
-Each feed error has `source` and `error`. An empty unparseable feed reports
-`Feed could not be parsed`; other exceptions expose `str(exc)[:300]`. There is no
-response model, skipped-entry count, partial-coverage header or snapshot metadata.
+Each feed error retains exactly `source` and `error`. Messages are sanitized
+constants; upstream bodies and exception strings are never forwarded. Validated
+Retry-After guidance is appended to that feed's error string without retries or
+sleeping. HTTP 200 remains the response even when both feeds fail, so callers must
+inspect `feed_errors`. There is no added response field or partial-coverage header.
+Successful empty snapshots produce no feed error.
 Commit failure explicitly rolls back and returns HTTP 500:
 
 ```json
@@ -37,22 +40,41 @@ Commit failure explicitly rolls back and returns HTTP 500:
 | BBC World | `https://feeds.bbci.co.uk/news/world/rss.xml` | `bbc-world` |
 | NPR Politics | `https://feeds.npr.org/1014/rss.xml` | `npr-politics` |
 
-The route calls `feedparser.parse(feed_url)` sequentially, with no explicit timeout,
-size bound, concurrency, pagination or retry policy. Each parsed entry is processed
-in original order. It does not apply research topic/entity filtering, relevance
-classification, publisher diversification or candidate budgets.
+`INGESTION_RSS_FEEDS` in [global_chess_config.py](app/global_chess_config.py)
+configures the approved IDs and legacy labels, separately from research. The route
+collects complete immutable Core snapshots sequentially in this order, using
+`get_core_discovery_client` and server-side `discovery:read` credentials. The
+existing base URL, API key and timeout settings apply. Caller-supplied body/query
+URLs are ignored. Direct feedparser networking and fallback are removed.
 
-- Missing, null, empty or whitespace-only titles/links are silently skipped.
+The client validates every page/cursor/offset and immutable snapshot identity,
+retaining ordered duplicate observations. Collection is bounded to seven pages,
+500 observations, 60 seconds and 4 MiB aggregate response content per feed. The
+byte validation runs after HTTP buffering, not as a streaming download cap; Core
+separately bounds feed downloads. No snapshot restarts or automatic retries occur.
+The client disables environment proxies and redirects to other Core destinations.
+
+Both feed collections finish before database work. A synchronous worker thread
+runs the Topic writer using the request session, avoiding SQL work on the event
+loop and network waits inside the database transaction. It does not apply research
+topic/entity filtering, relevance classification, publisher diversification or
+candidate budgets.
+
+- Invalid/missing titles or URLs are rejected and coverage is reported, retaining usable entries.
 - Titles are stripped, scored in full, then stored at most 500 characters long.
 - URL normalization removes common tracking parameters/fragments, lowercases
   scheme/host, and removes trailing path slashes. There is no scheme, public-IP,
-  absolute-URL or 2,048-character validation in this ingestion path. Relative,
-  FTP and literal-private URLs are stored without being fetched as articles.
+  absolute-URL validation in the legacy route. The migrated client/adapter now
+  validates public HTTP(S) URLs and a 2,048-character bound, including normalized
+  length before storage. Relative originals are resolved by Core and preserved
+  in provenance; relative destination URLs, FTP and literal-private destinations
+  are rejected. Candidates are never fetched as articles during ingestion.
 - `Topic.source` is the configured feed label, ignoring entry publisher metadata.
 - New records get an auto-generated ID, `candidate` status, null summary, parsed
   publication date, scores, and the model's UTC `fetched_at` insertion default.
   Even zero-relevance stories are inserted. Snippets, feed item IDs and discovery
-  provenance are not Topic fields and are not persisted.
+  provenance are preserved in transient ingestion observations, not Topic columns.
+  They are never passed as ORM constructor fields and are not persisted.
 - Existing rows retain ID, URL, editorial status and summary. Title, source,
   publication date, fetched timestamp and all scores are overwritten. A missing
   incoming date erases an existing date rather than preserving it.
@@ -60,8 +82,9 @@ classification, publisher diversification or candidate budgets.
 The [Topic model](app/models/topic.py) uses a unique URL, `String(500)` title,
 `String(2048)` URL, `String(200)` source and timezone-aware timestamp declarations.
 SQLite does not enforce VARCHAR lengths or retain timestamp timezone metadata;
-PostgreSQL does. An oversized URL succeeds on SQLite but fails the final commit
-on PostgreSQL. This backend difference is covered explicitly.
+PostgreSQL does. The migrated adapter rejects oversized URLs on both backends
+before writes, unlike the legacy SQLite-success/PostgreSQL-500 behavior. It also
+rejects NUL in titles; full valid titles are scored before the 500-character cut.
 
 ## Publication dates and scoring
 
@@ -69,7 +92,13 @@ on PostgreSQL. This backend difference is covered explicitly.
 helpers and the Global Chess scorer. Actual date logic lives in
 [source_normalization.py](app/utils/source_normalization.py).
 
-Date precedence is truthy `published_parsed`, otherwise raw `published` or raw
+The migrated route uses Core's timezone-aware UTC datetime/null directly, never
+reparsing it through the feedparser dictionary helper. Core can parse ISO dates
+that the legacy raw-string fallback could not; this may change freshness where
+legacy parsing lost a date. Topic `fetched_at` is local ingestion time, not Core's
+shared snapshot timestamp.
+
+For historical comparison, legacy date precedence was truthy `published_parsed`, otherwise raw `published` or raw
 `updated`. Parsed publication tuples are interpreted as UTC; RFC date strings
 are converted to UTC, with naive timestamps assumed UTC. `updated_parsed` alone
 is ignored. An invalid nonempty `published` prevents fallback to `updated`.
@@ -120,53 +149,50 @@ insert the same URL. A database error still rolls back the entire transaction.
 
 Feed failure has different semantics from commit failure:
 
-- Empty `bozo` feeds report an error and processing continues to the next feed.
-- `bozo` feeds with entries are processed without a feed error.
-- An exception mid-feed aborts its remaining entries, but earlier pending writes
-  remain and commit alongside successful later feeds. Invalid title types, URL
-  parsing errors and malformed date tuples exhibit this behavior.
-- Both feeds failing still returns 200 with two feed errors. Raw exception text
-  can expose diagnostics; the current route does not sanitize it beyond length.
+- Empty success contributes no rows and no error. Incomplete snapshots contribute
+  all accepted entries plus a coverage error, including metadata/date warnings.
+- Later-page failure/410 expiration retains all prior validated pages; the next
+  independent feed is still collected. Invalid cursors and changed snapshots do
+  not restart fetching. Malformed HTTP pages fail as a whole, retaining earlier
+  pages rather than trusting malformed page contents.
+- Authentication/permission failures, 429, 503, timeouts and malformed responses
+  produce safe per-feed errors. Retry-After is validated and reported, never slept
+  or retried. Both feeds failing still returns 200 with two feed errors.
+- Invalid injected-client candidates are rejected individually, preserving other
+  valid entries and reporting incomplete coverage. Unexpected writer errors abort
+  that feed's remaining entries with a sanitized error, as before.
 - A failure after actual SQL INSERT/UPDATE operations but before commit completion
   rolls everything back and preserves prior database values.
 
-## Core RSS compatibility and migration strategy
+## Compatibility and deployment considerations
 
-Core's [RSS contracts](app/services/discovery/rss_contracts.py) provide approved
-feed IDs, immutable snapshots, ordered duplicate observations, UTC dates, explicit
-rejections/warnings and pagination. The [existing Global Chess client](app/clients/argus_core_client.py)
-collects all pages and carries validated partial sources in `RSSDiscoveryError`.
-It can be reused for retrieval, but research's editorial selection function cannot
-be reused for ingestion: that would introduce filtering, budgets and deduplication.
+The [ingestion adapter](app/services/ingestion_discovery.py) reconstructs and
+validates Global Chess-owned RSS candidate contracts from the existing client's
+source dictionaries. It preserves full titles, URLs, snippets, UTC dates and
+provider metadata/provenance, applying no editorial filtering or deduplication.
+The existing Topic writer alone owns scoring, label assignment and URL winner
+selection. There are no imports of Core implementation services.
 
-1. Keep these characterization and deduplication tests as the baseline. The
-   request-local normalized-URL map and distinct-topic counters are implemented;
-   preserve them when replacing retrieval. No global autoflush change is needed.
-2. Replace only retrieval with the Global Chess-owned authenticated Core client,
-   using server-side `discovery:read` credentials and the approved IDs above.
-   Preserve configured order/labels, full snapshot traversal and duplicate
-   observations; do not add direct-provider fallback or snapshot restart/retries.
-3. Adapt full titles and UTC datetime/null values directly into the existing
-   scorer and Topic writer. Do not pass Core datetimes through the legacy
-   feedparser-dictionary date parser. Keep scoring and editorial state ownership
-   in Global Chess, including score-before-title-truncation behavior. Keep Topic
-   `fetched_at` as ingestion time; Core's snapshot timestamp describes shared cache
-   retrieval and is not the time this Topic was ingested.
-4. Agree on strict-parser compatibility changes before implementing: Core rejects
-   unsafe/invalid/overlong article URLs, resolves relative links, bounds title and
-   snippet fields, and rejects malformed XML instead of feedparser recovery.
-   Limits on fields ingestion does not store can still reject an entire entry.
-   Core's broader date parsing can change freshness compared with legacy fallback.
-5. Preserve usable entries from incomplete snapshots or later-page failures and
-   report failed coverage through the existing `feed_errors` shape. Define how
-   rejected observations, cursor expiration, 401/403, 429/Retry-After, outages and
-   timeouts map into that contract; changing HTTP status/adding response fields
-   requires an explicit compatibility decision. Never call missing coverage an
-   ordinary empty success.
-6. Keep one final database transaction, explicit rollback, unique Topic URLs,
-   candidate defaults and existing editorial state preservation. Do not register
-   candidates in Core or change schemas. Rerun both database backends and add
-   mocked Core pagination/authentication/error tests before enabling retrieval.
+Core's [RSS contracts](app/services/discovery/rss_contracts.py) and
+[existing client](app/clients/argus_core_client.py) remain unchanged. The server-side
+key needs `discovery:read`; credentials never enter browser responses or feed
+requests. BBC/NPR identifiers must be approved/enabled and Redis snapshot storage
+available on Core. No database migration is required.
+
+Compared with legacy feedparser recovery, strict Core XML parsing can reject an
+entire malformed feed. Unsafe/invalid URLs and field limits now generate explicit
+coverage errors; limits on unused snippet metadata can still reject an entry.
+Valid entries after a rejected entry can survive, whereas a legacy per-entry
+exception stopped that feed's remainder. Missing dates remain valid null values;
+unparseable date warnings can additionally mark a Core snapshot incomplete.
+These are intentional provider/security compatibility changes, not editorial
+policy changes. The public body stays `{inserted, updated, feed_errors}`.
+
+Provenance remains transient because Topic has no provenance column. Durable
+storage and separate concurrent-ingestion URL races require separate decisions;
+the unique URL constraint still protects concurrent writes and can reject a racing
+transaction. Legacy application's separate startup schema initialization behavior
+is unchanged.
 
 At Core's maximum 500 observations and page size 75, ingestion may need 14 Core
 requests: two initial discovery operations and 12 continuations, all also charged
@@ -177,11 +203,12 @@ explicit failure cases compared with legacy unbounded feed traversal.
 ## Isolated verification
 
 [test_ingestion_characterization.py](tests/test_ingestion_characterization.py)
-mocks all feed retrieval, freezes scoring/fetch clocks, and overrides the request
-session. It uses memory SQLite and optionally disposable PostgreSQL 17. PostgreSQL
+mocks Core HTTP or the injectable discovery client, forbids direct feed retrieval,
+freezes scoring/fetch clocks, and overrides the request session. Tests cover real
+wire pagination, partial failures, malformed candidates, deadlines and persistence. It uses memory SQLite and optionally disposable PostgreSQL 17. PostgreSQL
 requires an explicit test URL and independently verified cluster system identifier;
 each case creates/drops only its own random test schema. It never imports the
 legacy application's schema-creating startup lifecycle or uses its real session.
 
-No prior dedicated `/ingest` or scoring tests were found; existing research,
-analysis and migration tests mainly seed Topic records for other workflows.
+Original characterization tests have been adapted to typed Core inputs; the
+unchanged scoring helper and database deduplication/rollback invariants remain covered.

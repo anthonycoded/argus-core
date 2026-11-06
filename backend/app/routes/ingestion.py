@@ -1,51 +1,51 @@
 
 from datetime import datetime, timezone
 
-import feedparser
 from fastapi import APIRouter, Depends, HTTPException
+from starlette.concurrency import run_in_threadpool
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.config import FEEDS
+from app.clients.argus_core_client import CoreDiscoveryClient, get_core_discovery_client
+from app.global_chess_config import INGESTION_RSS_FEEDS
 from app.database import get_db
 from app.models import Topic
 from app.services.rss_service import (
     normalize_url,
-    parse_published,
     score_topic,
 )
+from app.services.ingestion_discovery import IngestionFeed, collect_ingestion_feed
 
 router = APIRouter(tags=["Ingestion"])
 
 
 @router.post("/ingest")
-def ingest_topics(db: Session = Depends(get_db)):
+async def ingest_topics(
+    db: Session = Depends(get_db),
+    discovery_client: CoreDiscoveryClient = Depends(get_core_discovery_client),
+):
+    feeds = []
+    for source, feed_id in INGESTION_RSS_FEEDS:
+        feeds.append(await collect_ingestion_feed(source, feed_id, discovery_client))
+    return await run_in_threadpool(_persist_topics, feeds, db)
+
+
+def _persist_topics(feeds: list[IngestionFeed], db: Session):
     inserted = 0
     updated = 0
     feed_errors = []
     # Include pending inserts: SELECT cannot see them with autoflush disabled.
     topics_by_url: dict[str, Topic] = {}
 
-    for source, feed_url in FEEDS.items():
+    for feed in feeds:
+        source = feed.source
+        if feed.error:
+            feed_errors.append({"source": source, "error": feed.error})
         try:
-            feed = feedparser.parse(feed_url)
-
-            if getattr(feed, "bozo", False) and not feed.entries:
-                feed_errors.append({
-                    "source": source,
-                    "error": "Feed could not be parsed",
-                })
-                continue
-
-            for entry in feed.entries:
-                title = (entry.get("title") or "").strip()
-                link = (entry.get("link") or "").strip()
-
-                if not title or not link:
-                    continue
-
-                url = normalize_url(link)
-                published_at = parse_published(entry)
+            for observation in feed.observations:
+                title = observation.candidate.title
+                url = normalize_url(observation.candidate.url)
+                published_at = observation.candidate.published_at
 
                 relevance, freshness, score = score_topic(
                     title,
@@ -86,10 +86,10 @@ def ingest_topics(db: Session = Depends(get_db)):
                     inserted += 1
                 topics_by_url[url] = existing
 
-        except Exception as exc:
+        except Exception:
             feed_errors.append({
                 "source": source,
-                "error": str(exc)[:300],
+                "error": "Topic processing failed; feed coverage is incomplete.",
             })
 
     try:
