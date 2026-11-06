@@ -88,3 +88,18 @@ def test_article_extraction_invalid_url(client):
     )
 
     assert response.status_code == 422
+
+
+def test_article_extraction_blocks_ssrf_with_existing_response_contract(client):
+    response = client.post(
+        "/api/v1/articles/extract",
+        json={"url": "http://169.254.169.254/latest/meta-data/"},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "url": "http://169.254.169.254/latest/meta-data/",
+        "extraction_status": "request_error",
+        "article_text": None,
+        "extraction_error": "Unsafe article destination.",
+    }

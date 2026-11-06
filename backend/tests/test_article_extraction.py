@@ -8,6 +8,7 @@ from app.services.article_extraction import (
     extract_article,
     extract_articles,
 )
+from app.services.article_fetch import PublicHTTPTransport
 
 
 @pytest.fixture
@@ -30,7 +31,10 @@ def sample_response():
     response.headers = {
         "content-type": "text/html; charset=utf-8"
     }
-    response.text = "<html><body>Article content</body></html>"
+    response.request = httpx.Request("GET", "https://example.com/article")
+    async def raw_body():
+        yield b"<html><body>Article content</body></html>"
+    response.aiter_raw = raw_body
     response.raise_for_status = MagicMock()
     return response
 
@@ -42,7 +46,8 @@ async def test_extract_article_success(
     sample_response,
 ):
     client = AsyncMock()
-    client.get.return_value = sample_response
+    client.stream = MagicMock()
+    client.stream.return_value.__aenter__ = AsyncMock(return_value=sample_response)
 
     with patch(
         "app.services.article_extraction.trafilatura.extract",
@@ -66,7 +71,7 @@ async def test_extract_article_rejects_invalid_url():
 
     assert result["extraction_status"] == "failed"
     assert result["extraction_error"] == "Invalid URL"
-    client.get.assert_not_called()
+    client.stream.assert_not_called()
 
 
 @pytest.mark.asyncio
@@ -79,7 +84,8 @@ async def test_extract_article_handles_http_error(sample_url):
         request=request,
     )
 
-    client.get.side_effect = httpx.HTTPStatusError(
+    client.stream = MagicMock()
+    client.stream.side_effect = httpx.HTTPStatusError(
         "Forbidden",
         request=request,
         response=response,
@@ -94,7 +100,7 @@ async def test_extract_article_handles_http_error(sample_url):
 @pytest.mark.asyncio
 async def test_extract_article_handles_timeout(sample_url):
     client = AsyncMock()
-    client.get.side_effect = httpx.ReadTimeout("Request timed out")
+    client.stream = MagicMock(side_effect=httpx.ReadTimeout("Request timed out"))
 
     result = await extract_article(sample_url, client)
 
@@ -114,7 +120,9 @@ async def test_extract_article_rejects_unsupported_content_type(
     }
     response.raise_for_status = MagicMock()
 
-    client.get.return_value = response
+    response.status_code = 200
+    client.stream = MagicMock()
+    client.stream.return_value.__aenter__ = AsyncMock(return_value=response)
 
     result = await extract_article(sample_url, client)
 
@@ -128,7 +136,8 @@ async def test_extract_article_handles_missing_content(
     sample_response,
 ):
     client = AsyncMock()
-    client.get.return_value = sample_response
+    client.stream = MagicMock()
+    client.stream.return_value.__aenter__ = AsyncMock(return_value=sample_response)
 
     with patch(
         "app.services.article_extraction.trafilatura.extract",
@@ -172,6 +181,13 @@ async def test_extract_articles_preserves_source_metadata(
             return_value=extraction_result,
         ):
             results = await extract_articles(sources)
+
+        assert client_class.call_args.kwargs["trust_env"] is False
+        assert client_class.call_args.kwargs["follow_redirects"] is False
+        assert client_class.call_args.kwargs["headers"]["Accept-Encoding"] == "identity"
+        transport = client_class.call_args.kwargs["transport"]
+        assert isinstance(transport, PublicHTTPTransport)
+        await transport.aclose()
 
     assert len(results) == 1
     assert results[0]["title"] == "Example geopolitical article"

@@ -1,5 +1,7 @@
 annotated-doc==0.0.5
 annotated-types==0.8.0
+# SSRF transport compatibility: keep AnyIO/HTTPX/httpcore exactly pinned.
+# See backend/ARTICLE_FETCH_SECURITY.md before upgrading this trio.
 anyio==4.15.1
 babel==2.18.0
 beautifulsoup4==4.15.0
