@@ -13,6 +13,7 @@ def create_app(
     routers: Sequence[APIRouter] = (),
     initialize_database: Callable[[], None] | None = None,
     on_shutdown: Callable[[], Awaitable[None]] | None = None,
+    audit_session_factory: Callable | None = None,
 ) -> FastAPI:
 
     @asynccontextmanager
@@ -33,5 +34,13 @@ def create_app(
 
     for router in routers:
         application.include_router(router)
+
+    if audit_session_factory is not None:
+        from app.core.audit import RequestAuditMiddleware
+
+        application.add_middleware(
+            RequestAuditMiddleware,
+            session_factory=audit_session_factory,
+        )
 
     return application
