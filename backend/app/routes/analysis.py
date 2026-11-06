@@ -4,7 +4,7 @@ import json
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app.config import OLLAMA_MODEL
+from app.clients.argus_core_client import CoreInferenceClient, get_core_inference_client
 from app.database import get_db
 from app.models import Topic, TopicAnalysis
 from app.services.ollama_service import analyze_topic_with_ollama
@@ -16,6 +16,7 @@ router = APIRouter(prefix="/topics", tags=["Analysis"])
 async def analyze_topic(
     topic_id: int,
     db: Session = Depends(get_db),
+    inference_client: CoreInferenceClient = Depends(get_core_inference_client),
 ):
     topic = db.get(Topic, topic_id)
 
@@ -25,13 +26,15 @@ async def analyze_topic(
             detail="Topic not found",
         )
 
-    result = await analyze_topic_with_ollama(
+    generated = await analyze_topic_with_ollama(
         title=topic.title,
         source=topic.source,
         published_at=topic.published_at,
         summary=topic.summary,
         url=topic.url,
+        inference_client=inference_client,
     )
+    result = generated.analysis
 
     analysis = (
         db.query(TopicAnalysis)
@@ -50,7 +53,7 @@ async def analyze_topic(
     analysis.research_questions = json.dumps(
         result.research_questions
     )
-    analysis.model = OLLAMA_MODEL
+    analysis.model = generated.model
 
     try:
         db.commit()
@@ -66,5 +69,5 @@ async def analyze_topic(
         "topic_id": topic.id,
         "title": topic.title,
         "analysis": result.model_dump(),
-        "model": OLLAMA_MODEL,
+        "model": generated.model,
     }

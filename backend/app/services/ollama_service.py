@@ -1,12 +1,14 @@
 
 import httpx
 import logging
+from dataclasses import dataclass
 
 from fastapi import HTTPException
 from pydantic import BaseModel, Field
 
 from typing import Literal
 from app.clients.ollama_client import OllamaClient
+from app.clients.argus_core_client import CoreClientError, CoreInferenceClient, get_core_inference_client
 from app.schemas import StoryAnalysisResult
 
 logging.basicConfig(level=logging.INFO)
@@ -197,6 +199,12 @@ Classify the article according to the system instructions.
         )
         return None
 
+@dataclass(frozen=True)
+class AnalyzedTopic:
+    analysis: StoryAnalysisResult
+    model: str
+
+
 async def analyze_topic_with_ollama(
     *,
     title: str,
@@ -204,7 +212,9 @@ async def analyze_topic_with_ollama(
     published_at,
     summary: str | None,
     url: str,
-) -> StoryAnalysisResult:
+    inference_client: CoreInferenceClient | None = None,
+) -> AnalyzedTopic:
+    """Legacy function name; topic analysis exclusively uses authenticated Core HTTP."""
 
     prompt = f"""
         You are the editorial research assistant for Global Chess,
@@ -234,7 +244,7 @@ async def analyze_topic_with_ollama(
     """
 
     try:
-        payload = await ollama_client.generate_structured(
+        generated = await (inference_client or get_core_inference_client()).generate_structured(
             system_prompt="You are a structured geopolitical research assistant.",
             user_prompt=prompt,
             response_schema=StoryAnalysisResult.model_json_schema(),
@@ -242,21 +252,20 @@ async def analyze_topic_with_ollama(
             temperature=0.2,
         )
 
-        content = payload["message"]["content"]
+        result = StoryAnalysisResult.model_validate_json(generated.content)
 
-        result = StoryAnalysisResult.model_validate_json(content)
-
-    except httpx.HTTPError as exc:
+    except CoreClientError as exc:
         raise HTTPException(
-            status_code=502,
-            detail=f"Ollama request failed: {exc}",
-        ) from exc
+            status_code=exc.status_code,
+            detail=exc.detail,
+            headers={"Retry-After": exc.retry_after} if exc.retry_after is not None else None,
+        ) from None
 
     except (ValueError, KeyError, TypeError) as exc:
         raise HTTPException(
             status_code=502,
-            detail="Ollama returned an invalid analysis response",
-        ) from exc
+            detail="Argus-Core returned an invalid analysis response",
+        ) from None
 
     if not (
         0 <= result.relevance <= 100
@@ -267,4 +276,4 @@ async def analyze_topic_with_ollama(
             detail="Ollama returned scores outside the 0–100 range",
         )
 
-    return result
+    return AnalyzedTopic(analysis=result, model=generated.model)
