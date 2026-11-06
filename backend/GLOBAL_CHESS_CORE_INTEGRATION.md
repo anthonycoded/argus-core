@@ -1,6 +1,7 @@
 # Global Chess topic analysis through Argus-Core
 
-Only `POST /topics/{topic_id}/analyze` has migrated in this milestone:
+`POST /topics/{topic_id}/analyze` and the research agent's planning, evaluation,
+and synthesis inference now use authenticated Core HTTP:
 
     Global Chess route -> editorial prompt and schema
         -> CoreInferenceClient -> authenticated HTTP POST /api/v1/ai/generate
@@ -11,7 +12,8 @@ The client and its settings belong to Global Chess and import no Core settings,
 database models or internal services. Existing packages, tables and editorial
 prompts remain in place. `analyze_topic_with_ollama` retains its legacy import name,
 but topic analysis never calls its module's direct Ollama client. Classification,
-research planning, research evaluation and synthesis retain their existing paths.
+discovery and ingestion retain their existing paths. Research inference uses
+`services/research_inference.py` for input-limit and Pydantic validation.
 
 ## Server-side configuration
 
@@ -75,8 +77,8 @@ idempotency guarantee for generation, so automatic retries could duplicate work.
 
 Core's existing prompt-size limits (10,000 system / 30,000 user characters),
 180-second maximum inference timeout, and application/key quotas now apply to
-topic analysis. Prompts are not silently truncated. Other research workflows are
-not migrated, and the existing legacy application still needs its own user-facing
+topic analysis and research inference. Prompts are not silently truncated. The
+existing legacy application still needs its own user-facing
 authentication/access controls. This milestone adds service authentication only.
 
 ## Offline testing
@@ -92,3 +94,48 @@ Inject the client through get_core_inference_client for route tests or through
 analyze_topic_with_ollama(inference_client=...) for service tests. Only this
 integration's new settings are independent; the pre-existing Global Chess database
 and other research configuration remain coupled until later separation milestones.
+
+## Research inference compatibility
+
+`generate_research_plan`, `evaluate_research_progress`, `synthesize_research`, and
+`run_research_agent` accept an optional keyword-only `inference_client`. Default
+calls use the same server-side settings and authenticated adapter as topic analysis.
+There is no direct-Ollama fallback. Discovery, ingestion, and relevance classification
+are unchanged; a full research job still uses their existing provider paths.
+
+Planning keeps temperature 0.2 and a 120-second inference timeout; evaluation keeps
+temperature 0 and 120 seconds; synthesis keeps temperature 0 and 180 seconds.
+Editorial prompts, schemas, citation checks, iteration limits, query deduplication,
+stopping decisions, and uncertainty reporting remain unchanged. Publication dates
+represented by Python date/datetime objects serialize as ISO strings for synthesis;
+source dictionaries are not mutated. Existing 25-source and 1,500-character snippet
+caps remain in place.
+
+**Input-size incompatibility:** Core accepts at most 10,000 system characters and
+30,000 user characters. The previous synthesis allowance alone permits 37,500
+snippet characters, excluding metadata; evaluation input and topic/question lengths
+also have no overall bound. The research adapter checks the complete rendered prompt
+before inference and raises a sanitized `CoreClientError(422)` if it cannot fit.
+No evidence is silently removed and no Core limit is increased. Larger jobs require
+an explicitly designed chunking strategy or a separately reviewed Core contract
+change. Tests compare these local guards against the real Core request schema.
+
+Core failures retain the adapter's status mapping and validated Retry-After value.
+Planning/evaluation propagate `CoreClientError` to callers, halting the agent before
+further work. Synthesis retains the existing partial-result behavior: sources remain
+available, status becomes incomplete, and limitations include the sanitized error
+and Retry-After guidance when present. No operation automatically retries or sleeps.
+Malformed structured output still fails Pydantic validation; invented citations
+still fail source-URL validation. Research functions do not write database records,
+and application routes and persistence are unchanged.
+
+The HTTP adapter validates and returns Core's actual model. ResearchPlan,
+ResearchDecision, ResearchSynthesis, and ResearchAgentResult currently have no model
+field, so this milestone does not add model metadata to those public contracts or
+invent provenance from local settings. Topic-analysis provenance remains unchanged.
+Durable per-stage research provenance needs a future contract/storage decision.
+
+An agent job consumes one planning request, up to `max_rounds` evaluation requests,
+and one synthesis request when sources exist (normally up to five calls at three
+rounds), in addition to unchanged discovery/classification activity. Core quotas,
+proxy timeouts, and the caller's overall job budget must accommodate this sequence.

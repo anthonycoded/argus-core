@@ -1,6 +1,9 @@
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock
+
+from pydantic import ValidationError
+from app.clients.argus_core_client import InferenceResult
 
 from app.schemas import ResearchSynthesis
 from app.services.synthesis_service import synthesize_research
@@ -54,28 +57,17 @@ async def test_synthesize_research_success(
     sample_sources,
     valid_synthesis,
 ):
-    mock_response = MagicMock()
-    mock_response.json.return_value = {
-        "message": {
-            "content": valid_synthesis.model_dump_json()
-        }
-    }
-    mock_response.raise_for_status = MagicMock()
-
-    mock_client = AsyncMock()
-    mock_client.post.return_value = mock_response
-
-    with patch(
-        "app.services.synthesis_service.httpx.AsyncClient"
-    ) as client_class:
-        client_class.return_value.__aenter__.return_value = mock_client
-
-        result = await synthesize_research(
-            topic="NATO defense initiative",
-            objective="Understand the initiative.",
-            research_questions=["What did NATO announce?"],
-            sources=sample_sources,
-        )
+    inference = AsyncMock()
+    inference.generate_structured.return_value = InferenceResult(
+        valid_synthesis.model_dump_json(), "actual-core-model",
+    )
+    result = await synthesize_research(
+        topic="NATO defense initiative",
+        objective="Understand the initiative.",
+        research_questions=["What did NATO announce?"],
+        sources=sample_sources,
+        inference_client=inference,
+    )
 
     assert isinstance(result, ResearchSynthesis)
     assert result.topic == "NATO defense initiative"
@@ -92,29 +84,19 @@ async def test_synthesize_research_rejects_unknown_source_url(
         "https://fake-source.com/article"
     )
 
-    mock_response = MagicMock()
-    mock_response.json.return_value = {
-        "message": {
-            "content": ResearchSynthesis(**data).model_dump_json()
-        }
-    }
-    mock_response.raise_for_status = MagicMock()
+    inference = AsyncMock()
+    inference.generate_structured.return_value = InferenceResult(
+        ResearchSynthesis(**data).model_dump_json(), "actual-core-model",
+    )
+    with pytest.raises(ValueError, match="referenced URLs"):
+        await synthesize_research(
+            topic="NATO defense initiative",
+            objective="Understand the initiative.",
+            research_questions=["What did NATO announce?"],
+            sources=sample_sources,
+            inference_client=inference,
+        )
 
-    mock_client = AsyncMock()
-    mock_client.post.return_value = mock_response
-
-    with patch(
-        "app.services.synthesis_service.httpx.AsyncClient"
-    ) as client_class:
-        client_class.return_value.__aenter__.return_value = mock_client
-
-        with pytest.raises(ValueError, match="referenced URLs"):
-            await synthesize_research(
-                topic="NATO defense initiative",
-                objective="Understand the initiative.",
-                research_questions=["What did NATO announce?"],
-                sources=sample_sources,
-            )
 
 
 @pytest.mark.asyncio
@@ -132,27 +114,15 @@ async def test_synthesize_research_rejects_empty_sources():
 async def test_synthesize_research_rejects_invalid_model_output(
     sample_sources,
 ):
-    mock_response = MagicMock()
-    mock_response.json.return_value = {
-        "message": {
-            "content": '{"invalid": "response"}'
-        }
-    }
-    mock_response.raise_for_status = MagicMock()
-
-    mock_client = AsyncMock()
-    mock_client.post.return_value = mock_response
-
-    with patch(
-        "app.services.synthesis_service.httpx.AsyncClient"
-    ) as client_class:
-        client_class.return_value.__aenter__.return_value = mock_client
-
-        with pytest.raises(Exception):
-            await synthesize_research(
-                topic="NATO defense initiative",
-                objective="Understand the initiative.",
-                research_questions=["What did NATO announce?"],
-                sources=sample_sources,
-            )
-
+    inference = AsyncMock()
+    inference.generate_structured.return_value = InferenceResult(
+        '{"invalid": "response"}', "actual-core-model",
+    )
+    with pytest.raises(ValidationError):
+        await synthesize_research(
+            topic="NATO defense initiative",
+            objective="Understand the initiative.",
+            research_questions=["What did NATO announce?"],
+            sources=sample_sources,
+            inference_client=inference,
+        )

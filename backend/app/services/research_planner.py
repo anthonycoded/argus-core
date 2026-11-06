@@ -1,8 +1,7 @@
 import logging
 
-import httpx
-
-from app.config import OLLAMA_BASE_URL, OLLAMA_MODEL
+from app.clients.argus_core_client import CoreInferenceClient
+from app.services.research_inference import generate_research_output
 from app.schemas import ResearchPlan, ResearchDecision
 
 logger = logging.getLogger(__name__)
@@ -10,6 +9,8 @@ logger = logging.getLogger(__name__)
 
 async def generate_research_plan(
     topic: str,
+    *,
+    inference_client: CoreInferenceClient | None = None,
 ) -> ResearchPlan:
 
     system_prompt = """
@@ -35,34 +36,11 @@ async def generate_research_plan(
     Create a research plan.
     """
 
-    async with httpx.AsyncClient(timeout=120.0) as client:
-        response = await client.post(
-            f"{OLLAMA_BASE_URL}/api/chat",
-            json={
-                "model": OLLAMA_MODEL,
-                "stream": False,
-                "format": ResearchPlan.model_json_schema(),
-                "messages": [
-                    {
-                        "role": "system",
-                        "content": system_prompt,
-                    },
-                    {
-                        "role": "user",
-                        "content": user_prompt,
-                    },
-                ],
-                "options": {
-                    "temperature": 0.2,
-                },
-            },
-        )
-
-        response.raise_for_status()
-
-    content = response.json()["message"]["content"]
-
-    return ResearchPlan.model_validate_json(content)
+    return await generate_research_output(
+        system_prompt=system_prompt, user_prompt=user_prompt,
+        response_model=ResearchPlan, timeout=120.0, temperature=0.2,
+        inference_client=inference_client,
+    )
 
 
 
@@ -72,6 +50,8 @@ async def evaluate_research_progress(
     sources: list[dict],
     round_number: int,
     max_rounds: int = 3,
+    *,
+    inference_client: CoreInferenceClient | None = None,
 ) -> ResearchDecision:
 
     source_summaries = [
@@ -161,33 +141,8 @@ async def evaluate_research_progress(
     missing_information list.
     """
 
-    async with httpx.AsyncClient(timeout=120.0) as client:
-        response = await client.post(
-            f"{OLLAMA_BASE_URL}/api/chat",
-            json={
-                "model": OLLAMA_MODEL,
-                "stream": False,
-                "format": ResearchDecision.model_json_schema(),
-                "messages": [
-                    {
-                        "role": "system",
-                        "content": system_prompt,
-                    },
-                    {
-                        "role": "user",
-                        "content": user_prompt,
-                    },
-                ],
-                "options": {
-                    "temperature": 0,
-                },
-            },
-        )
-
-        response.raise_for_status()
-
-    content = response.json()["message"]["content"]
-
-    return ResearchDecision.model_validate_json(content)
-
-
+    return await generate_research_output(
+        system_prompt=system_prompt, user_prompt=user_prompt,
+        response_model=ResearchDecision, timeout=120.0, temperature=0,
+        inference_client=inference_client,
+    )

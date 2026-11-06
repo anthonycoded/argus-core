@@ -1,5 +1,6 @@
 import logging
 
+from app.clients.argus_core_client import CoreClientError, CoreInferenceClient, get_core_inference_client
 from app.schemas import ResearchAgentResult
 from app.services.synthesis_service import synthesize_research
 from app.services.research_planner import (
@@ -18,6 +19,8 @@ async def run_research_agent(
     topic: str,
     max_rounds: int = 3,
     sources_per_query: int = 5,
+    *,
+    inference_client: CoreInferenceClient | None = None,
 ) -> ResearchAgentResult:
 
     if not topic.strip():
@@ -42,7 +45,8 @@ async def run_research_agent(
     # 1. Generate research plan
     # --------------------------------------------------
 
-    plan = await generate_research_plan(topic)
+    inference_client = inference_client or get_core_inference_client()
+    plan = await generate_research_plan(topic, inference_client=inference_client)
 
     research_questions = plan.research_questions
 
@@ -118,6 +122,7 @@ async def run_research_agent(
             sources=current_sources,
             round_number=round_number,
             max_rounds=max_rounds,
+            inference_client=inference_client,
         )
 
         decision_history.append({
@@ -229,6 +234,7 @@ async def run_research_agent(
                 objective=plan.objective,
                 research_questions=research_questions,
                 sources=final_sources,
+                inference_client=inference_client,
             )
 
             logger.info(
@@ -236,11 +242,18 @@ async def run_research_agent(
                 topic,
             )
 
-        except Exception:
-            logger.exception(
-                "Evidence synthesis failed for: %s",
-                topic,
-            )
+        except Exception as exc:
+            if isinstance(exc, CoreClientError):
+                logger.warning("Evidence synthesis failed: %s", exc.detail)
+                detail = exc.detail
+                if exc.retry_after is not None:
+                    detail += f" Retry-After: {exc.retry_after}."
+                limitations.append(detail)
+            else:
+                logger.exception(
+                    "Evidence synthesis failed for: %s",
+                    topic,
+                )
 
             limitations.append(
                 "Evidence synthesis failed. "

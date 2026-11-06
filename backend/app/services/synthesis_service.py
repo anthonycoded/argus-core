@@ -1,10 +1,10 @@
 
 import json
 import logging
+from datetime import date, datetime
 
-import httpx
-
-from app.config import OLLAMA_BASE_URL, OLLAMA_MODEL
+from app.clients.argus_core_client import CoreInferenceClient
+from app.services.research_inference import generate_research_output
 from app.schemas import ResearchSynthesis
 
 logger = logging.getLogger(__name__)
@@ -15,6 +15,8 @@ async def synthesize_research(
     objective: str,
     research_questions: list[str],
     sources: list[dict],
+    *,
+    inference_client: CoreInferenceClient | None = None,
 ) -> ResearchSynthesis:
 
     if not sources:
@@ -24,10 +26,13 @@ async def synthesize_research(
     source_payload = []
 
     for source in sources[:25]:
+        published_at = source.get("published_at")
+        if isinstance(published_at, (date, datetime)):
+            published_at = published_at.isoformat()
         source_payload.append({
             "title": source.get("title", ""),
             "publisher": source.get("publisher", ""),
-            "published_at": source.get("published_at"),
+            "published_at": published_at,
             "snippet": (source.get("snippet") or "")[:1500],
             "url": source.get("url", ""),
         })
@@ -118,34 +123,11 @@ async def synthesize_research(
         topic,
     )
 
-    async with httpx.AsyncClient(timeout=180.0) as client:
-        response = await client.post(
-            f"{OLLAMA_BASE_URL}/api/chat",
-            json={
-                "model": OLLAMA_MODEL,
-                "stream": False,
-                "format": ResearchSynthesis.model_json_schema(),
-                "messages": [
-                    {
-                        "role": "system",
-                        "content": system_prompt,
-                    },
-                    {
-                        "role": "user",
-                        "content": user_prompt,
-                    },
-                ],
-                "options": {
-                    "temperature": 0,
-                },
-            },
-        )
-
-        response.raise_for_status()
-
-    content = response.json()["message"]["content"]
-
-    synthesis = ResearchSynthesis.model_validate_json(content)
+    synthesis = await generate_research_output(
+        system_prompt=system_prompt, user_prompt=user_prompt,
+        response_model=ResearchSynthesis, timeout=180.0, temperature=0,
+        inference_client=inference_client,
+    )
 
     # Verify that the model did not invent source URLs.
     referenced_urls = set()
