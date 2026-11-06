@@ -32,6 +32,11 @@ AI_GENERATION_LIMIT = RateLimit(
     window_seconds=60,
 )
 
+DISCOVERY_LIMIT = RateLimit(
+    requests=10,
+    window_seconds=60,
+)
+
 
 @dataclass(frozen=True)
 class RateLimitDecision:

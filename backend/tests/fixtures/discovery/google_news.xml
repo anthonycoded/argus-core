@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0"><channel>
+  <title>Google News fixture</title>
+  <item>
+    <title>Supplied report — Example News</title>
+    <link>https://news.google.com/rss/articles/fixture-one?utm_source=test</link>
+    <guid isPermaLink="false">fixture-one</guid>
+    <pubDate>Fri, 06 Nov 2026 12:00:00 +0200</pubDate>
+    <source url="https://example.com/">Example News</source>
+    <description><![CDATA[<a href="https://example.com/report">A supplied snippet.</a>]]></description>
+  </item>
+  <item>
+    <title>Repeated wrapper link</title>
+    <link>https://news.google.com/rss/articles/fixture-one?utm_medium=rss</link>
+  </item>
+  <item>
+    <title>Report without a date</title>
+    <link>https://example.com/another?gclid=tracking</link>
+    <description>Only supplied source information.</description>
+  </item>
+  <item><title>Unsafe link</title><link>http://169.254.169.254/latest/meta-data/</link></item>
+</channel></rss>
