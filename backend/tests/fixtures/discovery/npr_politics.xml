@@ -1,0 +1,7 @@
+<?xml version="1.0"?>
+<rss version="2.0" xmlns:dc="http://purl.org/dc/elements/1.1/">
+<channel><title>NPR Politics fixture</title>
+<item><title>NPR supplied report</title><link>https://www.npr.org/2026/11/06/report</link>
+<guid>npr-one</guid><dc:date>2026-11-06T10:00:00Z</dc:date><description>Supplied NPR snippet.</description></item>
+<item><title>NPR uncertain date</title><link>https://www.npr.org/other</link><pubDate>not a date</pubDate></item>
+</channel></rss>
