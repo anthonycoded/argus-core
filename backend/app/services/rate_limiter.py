@@ -37,6 +37,12 @@ DISCOVERY_LIMIT = RateLimit(
     window_seconds=60,
 )
 
+# Cursor pages only read existing immutable RSS snapshots; they cannot fetch.
+RSS_CONTINUATION_LIMIT = RateLimit(
+    requests=60,
+    window_seconds=60,
+)
+
 
 @dataclass(frozen=True)
 class RateLimitDecision:

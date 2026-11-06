@@ -105,7 +105,7 @@ async def run_research_agent(
             except ResearchDiscoveryError as exc:
                 discovered = exc.partial_sources
                 discovery_failed = True
-                detail = "Google News discovery incomplete: " + exc.detail
+                detail = "Research discovery incomplete: " + exc.detail
                 if exc.retry_after is not None:
                     detail += f" Retry-After: {exc.retry_after}."
                 limitations.append(detail)

@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response
 from fastapi.responses import JSONResponse
 
 from app.core.permissions import require_scopes
+from app.core.auth import AuthenticatedApplication, get_current_application
 from app.core.rate_limit import require_rate_limit
 from app.services.discovery.contracts import (
     ERRORS, DiscoveryError, DiscoveryProvider, DiscoveryProviderResult, DiscoveryRequest,
@@ -10,7 +11,7 @@ from app.services.discovery.google_news import GoogleNewsProvider
 from app.services.discovery.rss import RSSProvider
 from app.services.discovery.rss_contracts import RSSDiscoveryRequest, RSSDiscoveryResult, RSS_ERRORS, RSSFault
 from app.services.discovery.rss_store import RedisSnapshotStore
-from app.services.rate_limiter import DISCOVERY_LIMIT, GENERAL_API_LIMIT
+from app.services.rate_limiter import DISCOVERY_LIMIT, GENERAL_API_LIMIT, RSS_CONTINUATION_LIMIT
 
 router = APIRouter(prefix="/discovery", tags=["Discovery"])
 
@@ -29,6 +30,20 @@ def get_rss_provider() -> RSSProvider:
 DiscoveryAPIRequest = DiscoveryRequest | RSSDiscoveryRequest
 
 
+async def require_discovery_rate_limit(
+    request: DiscoveryAPIRequest,
+    response: Response,
+    auth: AuthenticatedApplication = Depends(get_current_application),
+):
+    # Even invalid cursors use the bounded continuation bucket. RSSProvider's
+    # cursor branch must never create/refresh a snapshot or fetch externally.
+    continuation = isinstance(request, RSSDiscoveryRequest) and request.cursor is not None
+    return await require_rate_limit(
+        bucket="rss_continuation" if continuation else "discovery",
+        rate_limit=RSS_CONTINUATION_LIMIT if continuation else DISCOVERY_LIMIT,
+    )(response=response, auth=auth)
+
+
 @router.post("", response_model=DiscoveryProviderResult | RSSDiscoveryResult, responses={
     429: {"description": "Application/key quota or provider throttling"},
     502: {"model": DiscoveryProviderResult}, 504: {"model": DiscoveryProviderResult},
@@ -37,7 +52,7 @@ async def discover(
     request: DiscoveryAPIRequest,
     _auth=Depends(require_scopes("discovery:read")),
     _general=Depends(require_rate_limit(bucket="general", rate_limit=GENERAL_API_LIMIT)),
-    _discovery=Depends(require_rate_limit(bucket="discovery", rate_limit=DISCOVERY_LIMIT)),
+    _discovery=Depends(require_discovery_rate_limit),
     provider: DiscoveryProvider = Depends(get_discovery_provider),
     rss_provider: RSSProvider = Depends(get_rss_provider),
 ):

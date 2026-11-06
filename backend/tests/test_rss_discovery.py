@@ -286,7 +286,7 @@ async def test_rss_api_pagination_authorized_no_persistence(api_context):
         assert first.status_code == 200 and first.json()["status"] == "incomplete"
         next_page = await client.post("/api/v1/discovery", headers={"X-API-Key":key}, json={"provider":"rss", "feed_id":"bbc-world", "limit":2, "cursor":first.json()["next_cursor"]})
         assert next_page.status_code == 200 and next_page.json()["offset"] == 2
-    assert [c.kwargs["bucket"] for c in limiter.call_args_list] == ["general", "discovery"] * 2
+    assert [c.kwargs["bucket"] for c in limiter.call_args_list] == ["general", "discovery", "general", "rss_continuation"]
     fetcher.fetch.assert_awaited_once()
     assert "secret" not in first.text
 

@@ -12,8 +12,8 @@ The client and its settings belong to Global Chess and import no Core settings,
 database models or internal services. Existing packages, tables and editorial
 prompts remain in place. `analyze_topic_with_ollama` retains its legacy import name,
 but topic analysis never calls its module's direct Ollama client. Classification,
-RSS/GDELT discovery and ingestion retain their existing paths. Google News research
-discovery uses Core HTTP as described below. Research inference uses
+GDELT discovery and ingestion retain their existing paths. RSS and Google News research
+discovery use Core HTTP as described below. Research inference uses
 `services/research_inference.py` for input-limit and Pydantic validation.
 
 ## Server-side configuration
@@ -102,8 +102,8 @@ and other research configuration remain coupled until later separation milestone
 `generate_research_plan`, `evaluate_research_progress`, `synthesize_research`, and
 `run_research_agent` accept an optional keyword-only `inference_client`. Default
 calls use the same server-side settings and authenticated adapter as topic analysis.
-There is no direct-Ollama fallback. RSS/GDELT discovery, ingestion, and relevance
-classification retain their existing provider paths. Google News research uses Core.
+There is no direct-Ollama fallback. GDELT discovery, ingestion, and relevance
+classification retain their existing provider paths. RSS and Google News research use Core.
 
 Planning keeps temperature 0.2 and a 120-second inference timeout; evaluation keeps
 temperature 0 and 120 seconds; synthesis keeps temperature 0 and 180 seconds.
@@ -215,5 +215,60 @@ Core's separate 10/minute discovery quota, general quota, secure-fetch/parser li
 and locale restrictions now apply. The existing 190-second default HTTP phase timeout
 is shared with inference; Core currently bounds discovery operations at 25 seconds.
 Callers/proxies still need suitable total job budgets. See DISCOVERY_API.md for Core
-limits. Existing local RSS and relevance classification still require their original
-providers; this milestone does not make the entire research job Core-only.
+limits. Relevance classification retains its existing provider behavior.
+
+## RSS research discovery
+
+Research now uses `CoreDiscoveryClient.discover_rss(feed_id=...)`, authenticated with
+the existing server-side key, which must have `discovery:read`. It never parses or
+fetches RSS locally and has no direct-provider fallback. Ingestion is unchanged.
+`global_chess_config.RESEARCH_RSS_FEEDS` maps BBC World to `bbc-world` and NPR
+Politics to `npr-politics`, in that order. Ingestion's separate URL configuration
+is untouched. These identifiers must remain approved/enabled on the Core server.
+
+The Global Chess-owned `clients/rss_discovery_contracts.py` validates the wire
+response independently of Core internals. Each request uses provider `rss`, one
+feed ID, limit 75, and an optional opaque cursor. For each feed, the client collects
+one immutable snapshot before editorial filtering: at most seven pages and 500
+observations, including rejected entries, with a 60-second total deadline and a
+4 MiB aggregate response-content validation limit. The HTTP phase timeout setting
+still applies; the total deadline can cut it short. HTTP response buffering is
+provided by the existing trusted-Core client; the aggregate limit is checked before
+JSON parsing, not a streaming download limit. Core separately bounds RSS downloads.
+
+Snapshot identity/metadata, offsets, exact observation indices, page sizes, totals,
+rejection counts and cursor progression must agree. Cursors remain opaque: Core
+verifies their HMAC and application binding. Global Chess checks cursor presence,
+length, repeated tokens, snapshot continuity and page bounds. No automatic retry,
+sleep or snapshot restart occurs, including after 410 expiration or 429 throttling.
+Malformed pages fail as a whole; only evidence from validated pages is retained.
+Successful empty snapshots remain normal empty results. A Core `incomplete`
+snapshot is an explicit coverage failure even when all usable entries were fetched.
+
+Entry order and duplicate observations survive collection. Core provenance,
+original URLs (including relative originals), publisher attribution, UTC dates,
+snippets, feed identity, snapshot metadata and coverage counters remain in transient
+source metadata. Application publisher labels stay BBC World/NPR Politics. Existing
+topic matching, overlap ranking, first-wins ties, higher-overlap duplicate winners,
+1,000-character selected titles, candidate budgets, relevance classification, review
+queues, processed-URL deduplication and publisher diversification remain in Global
+Chess. The budget is applied after collection, never as a pagination cutoff.
+
+After a feed failure, valid earlier pages still enter editorial selection. The other
+configured feed and then Google News are independent operations and may contribute
+additional evidence. Research still classifies RSS first. Coverage errors name failed
+feeds; if several operations fail, their sanitized reasons are combined and the first
+failure determines status/Retry-After. Guidance is validated and returned without
+automatic retries. Errors use the existing partial-research headers/persistence path
+and incomplete-agent behavior described above. There are no database/schema changes.
+
+Deployment must budget up to 14 RSS discovery requests plus Google News per query,
+charged as 15 general, three initial-discovery and 12 continuation operations.
+Core retains its 10/minute discovery quota for fetch-capable requests and applies
+a separate 60/minute quota to RSS cursor pages, with the general 120/minute quota
+on all requests. One maximum-size query therefore fits without raising provider
+fetch limits. Concurrent queries and other traffic can still exhaust shared quotas.
+Snapshot TTL is five minutes; concurrency, quotas or delays may cause explicit expiration. Coordinate
+application/key quotas and job/proxy timeouts operationally; this change neither
+weakens quotas nor silently drops evidence to fit them. Metadata remains transient
+because the existing research table has no provenance column.

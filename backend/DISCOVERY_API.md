@@ -101,10 +101,12 @@ nonnegative seconds, capped at 86,400, in the envelope and response header.
 There are no automatic retries or sleeps.
 
 Existing authentication failures retain their HTTP 401/403 `detail` contract.
-The existing Redis limiter applies the general quota (120/minute) and a new
-discovery quota (10/minute), each shared across an application's keys and also
-enforced per key. Local quota failures use the existing 429 `detail` contract and
+The Redis limiter applies the general quota (120/minute) and the
+discovery quota (10/minute) to Google News and initial RSS requests, each shared
+across an application's keys and also enforced per key. Local quota failures use the existing 429 `detail` contract and
 Retry-After header. Redis failure fails closed with the existing 503 contract.
+RSS cursor pages use a separate 60/minute continuation quota plus the general
+quota; they cannot trigger provider fetches. See RSS_DISCOVERY.md.
 These are separate from upstream provider throttling. No distributed Google News
 cooldown/cache or aggregate cross-application provider quota is implemented yet.
 

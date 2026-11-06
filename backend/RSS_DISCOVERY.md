@@ -147,9 +147,18 @@ Worker clocks should be synchronized. No PostgreSQL source/topic records are use
   with bounded cancellation-shielded response/lease cleanup. Each Redis command
   has a two-second deadline. Native parsing steps cannot be forcibly preempted;
   byte/chunk/structure bounds constrain them.
-- Existing `discovery:read`, general (120/minute), and discovery (10/minute)
-  application/key quotas apply to every request, including cursor pages. Live
-  snapshot reuse bounds normal upstream polling to one refresh per feed per TTL.
+- Every request retains `discovery:read`, authentication, audit logging and the
+  general 120/minute quota. Google News and RSS requests without a cursor share
+  the unchanged `discovery` 10/minute application/key quota, even for cached first
+  pages. RSS requests with a cursor instead use a separate `rss_continuation`
+  60/minute application/key quota. Each bucket is shared across an application's
+  keys and also enforced per key. Continuations, including malformed cursors,
+  cannot create/refresh snapshots or fetch upstream; missing snapshots return 410.
+  Invalid signatures, application bindings, feeds and page sizes retain their
+  existing errors. Rate-limit denial returns 429 with the blocking bucket's
+  limit/remaining headers and Redis sliding-window Retry-After; Redis failure
+  remains fail-closed 503 with Retry-After 5. No automatic retries are introduced.
+  Live snapshot reuse bounds normal upstream polling to one refresh per feed per TTL.
   Upstream 429 establishes a shared cooldown from validated Retry-After, default
   60 seconds and capped at one day. Other fetch/parse errors establish a short
   cooldown (five seconds unless upstream guidance is provided). No automatic retry.
@@ -166,3 +175,13 @@ Discovery has no ORM/session or source-registration calls. Existing API-key usag
 audit logging and Redis quota accounting remain. The synthetic BBC/NPR fixtures
 and mocked HTTP/DNS tests do not assert today's live provider formatting/redirects.
 Global Chess migrations and wider format support are separate future milestones.
+
+At a page size of 75, a 500-observation feed needs seven requests (one initial,
+six continuations). Two feeds plus Google News need 15 general, three discovery,
+and 12 continuation requests. The former shared 10/minute discovery bucket could
+block the eleventh RSS request before the second feed completed. Separate buckets
+allow one maximum-size research query without increasing fetch-capable quotas.
+Concurrent queries can still exhaust any shared bucket; clients must report
+incomplete coverage and retain validated evidence. Small page sizes need more
+requests and may throttle. Snapshot TTL, resource bounds and provider protections
+are unchanged; continuation requests do not extend snapshot expiration.

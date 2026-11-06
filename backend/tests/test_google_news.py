@@ -21,7 +21,7 @@ KEY = "test-only-discovery-key"
 def offline(monkeypatch):
     monkeypatch.setattr(httpcore.AsyncConnectionPool, "handle_async_request", AsyncMock(
         side_effect=AssertionError("Unexpected live Core/provider HTTP")))
-    monkeypatch.setattr("app.services.research_service.feedparser.parse", Mock(
+    monkeypatch.setattr("feedparser.parse", Mock(
         side_effect=AssertionError("Google News discovery parsed/fetched a feed locally")))
 
 

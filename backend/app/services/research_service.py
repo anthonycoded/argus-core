@@ -7,13 +7,12 @@ from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 from urllib.parse import urlsplit
 
-import feedparser
 import httpx
 import re
 
-from app.clients.argus_core_client import CoreClientError, CoreDiscoveryClient, get_core_discovery_client
-from app.config import FEEDS
-from app.services.rss_service import normalize_url, parse_published
+from app.clients.argus_core_client import CoreClientError, CoreDiscoveryClient, RSSDiscoveryError, get_core_discovery_client
+from app.global_chess_config import RESEARCH_RSS_FEEDS
+from app.services.rss_service import normalize_url
 from app.services.ollama_service import classify_article_relevance
 
 logger = logging.getLogger(__name__)
@@ -161,91 +160,62 @@ def _feed_matches_topic(title: str, query: str) -> bool:
 
     return len(query_terms & title_terms) >= 2
 
-def discover_rss_sources(
+async def discover_rss_sources(
     query: str,
     limit: int = 10,
+    *,
+    discovery_client: CoreDiscoveryClient | None = None,
 ) -> list[dict]:
-    """Collect and rank Stage A candidates from configured RSS feeds."""
+    """Collect immutable Core snapshots, then apply Global Chess editorial policy."""
     candidates = {}
     query_terms = topic_terms(query)
-
     if not query_terms or limit <= 0:
         return []
-
-    for source, feed_url in FEEDS.items():
+    client = discovery_client or get_core_discovery_client()
+    provider_error = None
+    coverage_errors = []
+    for source, feed_id in RESEARCH_RSS_FEEDS:
         try:
-            feed = feedparser.parse(feed_url)
-
-            if getattr(feed, "bozo", False) and not feed.entries:
-                logger.warning("Could not parse RSS feed: %s", source)
+            observations = await client.discover_rss(feed_id=feed_id)
+        except CoreClientError as exc:
+            observations = exc.partial_sources if isinstance(exc, RSSDiscoveryError) else []
+            coverage_errors.append(f"{source}: {exc.detail}")
+            if provider_error is None:
+                provider_error = exc
+        # Collection completes (or explicitly fails) before any topic filtering.
+        # Duplicate observations survive transport; winner selection stays here.
+        for item in observations:
+            title = item["title"].strip()
+            if not _feed_matches_topic(title, query):
                 continue
-
-            for entry in feed.entries:
-                title = (entry.get("title") or "").strip()
-                link = (entry.get("link") or "").strip()
-
-                if not title or not link:
-                    continue
-
-                if not link.startswith(("https://", "http://")):
-                    continue
-
-                # Stage A: deterministic entity and subject filter.
-                if not _feed_matches_topic(title, query):
-                    continue
-
-                url = normalize_url(link)
-                if not url:
-                    continue
-
-                published_at = parse_published(entry)
-                overlap = query_terms & topic_terms(title)
-                relevance = len(overlap) / len(query_terms)
-
-                candidate = {
-                    "title": title[:1000],
-                    "url": url[:2048],
-                    "publisher": source[:255],
-                    "published_at": published_at,
-                    "snippet": (
-                        entry.get("summary")
-                        or entry.get("description")
-                        or None
-                    ),
-                    "source_type": "rss",
-                    "_relevance": relevance,
-                }
-
-                existing = candidates.get(url)
-
-                if (
-                    existing is None
-                    or candidate["_relevance"] > existing["_relevance"]
-                ):
-                    candidates[url] = candidate
-
-        except Exception:
-            logger.exception(
-                "RSS research failed for feed: %s",
-                source,
-            )
-
+            url = normalize_url(item["url"])
+            if not url:
+                continue
+            overlap = query_terms & topic_terms(title)
+            candidate = {
+                **item, "title": title[:1000], "url": url,
+                "publisher": source, "_relevance": len(overlap) / len(query_terms),
+            }
+            existing = candidates.get(url)
+            if existing is None or candidate["_relevance"] > existing["_relevance"]:
+                candidates[url] = candidate
     ranked = sorted(
         candidates.values(),
         key=lambda item: (
             item["_relevance"],
-            item["published_at"].timestamp()
-            if item["published_at"] is not None
-            else 0,
+            item["published_at"].timestamp() if item["published_at"] is not None else 0,
         ),
         reverse=True,
     )
-
-    return ranked[:limit]
+    selected = ranked[:limit]
+    if provider_error is not None:
+        error = CoreClientError(provider_error.status_code, "; ".join(coverage_errors), provider_error.retry_after)
+        raise ResearchDiscoveryError(error, selected) from None
+    return selected
 
 
 class ResearchDiscoveryError(CoreClientError):
-    """Explicit provider failure carrying already accepted RSS evidence."""
+    """Explicit discovery failure carrying already accepted evidence."""
 
     def __init__(self, error: CoreClientError, partial_sources: list[dict]):
         super().__init__(error.status_code, error.detail, error.retry_after)
@@ -371,11 +341,14 @@ async def discover_sources(
 
     candidate_limit = min(limit * 3, 75)
 
-    rss_candidates = await asyncio.to_thread(
-        discover_rss_sources,
-        query,
-        candidate_limit,
-    )
+    provider_error = None
+    try:
+        rss_candidates = await discover_rss_sources(
+            query, candidate_limit, discovery_client=discovery_client,
+        )
+    except ResearchDiscoveryError as exc:
+        provider_error = exc
+        rss_candidates = exc.partial_sources
     metrics["rss_candidates"] += len(rss_candidates)
     metrics["candidates_found"] += len(rss_candidates)
 
@@ -461,7 +434,6 @@ async def discover_sources(
 
     await classify_candidates(rss_candidates)
 
-    provider_error = None
     try:
         google_news_candidates = await discover_google_news_sources(
             query=query,
@@ -470,7 +442,13 @@ async def discover_sources(
         )
     except CoreClientError as exc:
         # Preserve RSS selection, but never disguise a failed request as empty.
-        provider_error = exc
+        if provider_error is None:
+            provider_error = exc
+        else:
+            provider_error = CoreClientError(
+                provider_error.status_code, provider_error.detail + "; Google News: " + exc.detail,
+                provider_error.retry_after,
+            )
         google_news_candidates = []
 
     metrics["google_news_candidates"] += len(
