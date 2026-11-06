@@ -12,7 +12,8 @@ The client and its settings belong to Global Chess and import no Core settings,
 database models or internal services. Existing packages, tables and editorial
 prompts remain in place. `analyze_topic_with_ollama` retains its legacy import name,
 but topic analysis never calls its module's direct Ollama client. Classification,
-discovery and ingestion retain their existing paths. Research inference uses
+RSS/GDELT discovery and ingestion retain their existing paths. Google News research
+discovery uses Core HTTP as described below. Research inference uses
 `services/research_inference.py` for input-limit and Pydantic validation.
 
 ## Server-side configuration
@@ -27,7 +28,8 @@ the existing backend/.env loader, without committing secret values):
 | GLOBAL_CHESS_CORE_REQUEST_TIMEOUT | 190 seconds | HTTPX request timeout per network phase, positive and at most 600 seconds |
 
 Register/issue credentials through the existing trusted Core administration
-workflow. The key needs `ai:generate`. Never put it in a browser, URL, request body,
+workflow. The key needs `ai:generate` for inference and `discovery:read` for Google
+News discovery. Never put it in a browser, URL, request body,
 tracked configuration, or access logs. SecretStr masks settings representations.
 Use TLS or an appropriately protected private network between deployed services.
 Do not point the client at Global Chess itself. Core and Global Chess must run at
@@ -100,8 +102,8 @@ and other research configuration remain coupled until later separation milestone
 `generate_research_plan`, `evaluate_research_progress`, `synthesize_research`, and
 `run_research_agent` accept an optional keyword-only `inference_client`. Default
 calls use the same server-side settings and authenticated adapter as topic analysis.
-There is no direct-Ollama fallback. Discovery, ingestion, and relevance classification
-are unchanged; a full research job still uses their existing provider paths.
+There is no direct-Ollama fallback. RSS/GDELT discovery, ingestion, and relevance
+classification retain their existing provider paths. Google News research uses Core.
 
 Planning keeps temperature 0.2 and a 120-second inference timeout; evaluation keeps
 temperature 0 and 120 seconds; synthesis keeps temperature 0 and 180 seconds.
@@ -139,3 +141,79 @@ An agent job consumes one planning request, up to `max_rounds` evaluation reques
 and one synthesis request when sources exist (normally up to five calls at three
 rounds), in addition to unchanged discovery/classification activity. Core quotas,
 proxy timeouts, and the caller's overall job budget must accommodate this sequence.
+
+## Google News research discovery
+
+The Global Chess client now exposes a separate `CoreDiscoveryClient` protocol and
+`discover_google_news(query=..., limit=...)` method. It sends one authenticated
+`POST /api/v1/discovery` using the existing Core base URL, server-side API key,
+and `GLOBAL_CHESS_CORE_REQUEST_TIMEOUT`. No settings/credentials or Core API contracts
+change. Environment proxies and redirects are disabled; injected HTTP clients stay
+caller-owned. There is no direct Google News fallback and no automatic retry/sleep.
+
+`clients/discovery_contracts.py` is Global Chess's independent wire adapter; it
+imports no Core services, models, or request schemas. It validates provider/status,
+the complete candidate batch and provenance, counters, and response limits. Core
+successfully returning zero candidates produces `[]`. HTTP errors, malformed JSON,
+malformed candidates, and a success response carrying an error are explicit failures.
+Invalid batches fail as a whole rather than silently discarding candidates. Unknown
+additional response fields are tolerated. The request matches Core's nonblank query
+limit of 1,000 characters and strict integer limit of 1-75; incompatible input fails
+locally with sanitized 422 without a Core request or query truncation.
+
+The adapter preserves title, URL, publisher, snippet, and `source_type=google_news`.
+Publication timestamps become timezone-aware UTC datetimes; null dates stay null,
+and invalid/naive dates are rejected. URLs are validated without rewriting/truncation
+or fetching. Canonical URL, domain, provider identity, and complete known provenance
+are retained in transient `provider_metadata`. Google wrapper URLs stay wrapped.
+Existing normalization, processed-URL deduplication, relevance classification,
+partial-match review entries, sorting, and publisher diversification remain in
+Global Chess. RSS is collected/classified first, then Google News, each with the
+existing `min(limit * 3, 75)` candidate budget. GDELT remains disabled in orchestration.
+
+`discover_google_news_sources(..., discovery_client=...)` returns application
+dictionaries. `discover_sources` and `run_research_agent` also accept this optional
+keyword-only dependency. Route tests can override `get_core_discovery_client`.
+The former live Google News tests now use mocked Core HTTP and offline fixtures.
+Contract tests additionally use Core's actual router/authentication in process,
+in-memory SQLite and a mocked provider fetcher, never a live news/model provider.
+
+### Failure and partial-result policy
+
+Core 401/403 become sanitized 502 integration failures. Core 429/503 retain those
+statuses; Core/client timeouts become 504; other rejected requests, malformed
+responses, and provider failures become 502. Valid Retry-After seconds/HTTP dates
+are retained on errors; invalid guidance is discarded. No upstream diagnostic
+body/exception text is forwarded or logged.
+
+If Google News fails after RSS selection, `ResearchDiscoveryError` carries the
+selected RSS sources. The research route preserves the existing body and persistence
+behavior when partial sources or review entries exist: it saves accepted sources
+and returns HTTP 200,
+with `X-Research-Partial: true`, `X-Research-Discovery-Status: <mapped error status>`,
+and validated `Retry-After` when present. Consumers must inspect these headers to
+detect incomplete provider coverage. With neither accepted partial sources nor review entries, the route
+returns the mapped error using the existing `{detail}` shape and makes no research
+record writes. Successful empty discovery remains a normal success, without partial
+headers. This deliberately replaces the old silent failure-as-empty behavior.
+
+The agent retains prior-round evidence and partial RSS sources, marks research
+incomplete, and reports the sanitized reason/Retry-After in limitations. It stops
+further discovery, evaluation, and synthesis requests after the failure; it does not
+retry the failing query or silently present partial coverage as completed research.
+Other stopping/iteration/editorial rules are unchanged on successful discovery.
+
+Research persistence explicitly selects the original six source fields before
+constructing an ORM record, so metadata cannot become unsupported model arguments.
+Existing title/publisher/date updates, insertion, commit/rollback, approval checks,
+and public source-summary fields are preserved. The current table has no provenance
+column: metadata survives in transient sources/review entries and agent results,
+but is not persisted or added to stored-source summaries. Durable provenance needs
+a separately approved contract/storage change. Snippets remain untrusted content.
+
+Core's separate 10/minute discovery quota, general quota, secure-fetch/parser limits,
+and locale restrictions now apply. The existing 190-second default HTTP phase timeout
+is shared with inference; Core currently bounds discovery operations at 25 seconds.
+Callers/proxies still need suitable total job budgets. See DISCOVERY_API.md for Core
+limits. Existing local RSS and relevance classification still require their original
+providers; this milestone does not make the entire research job Core-only.

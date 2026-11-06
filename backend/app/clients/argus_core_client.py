@@ -9,6 +9,7 @@ import httpx
 from pydantic import SecretStr
 
 from app.global_chess_config import global_chess_settings
+from app.clients.discovery_contracts import CoreDiscoveryResult, GoogleNewsDiscoveryRequest
 
 
 @dataclass(frozen=True)
@@ -35,6 +36,10 @@ class CoreInferenceClient(Protocol):
     ) -> InferenceResult: ...
 
 
+class CoreDiscoveryClient(Protocol):
+    async def discover_google_news(self, *, query: str, limit: int = 10) -> CoreDiscoveryResult: ...
+
+
 def validated_retry_after(value: str | None) -> str | None:
     if not value:
         return None
@@ -59,11 +64,7 @@ class ArgusCoreClient:
         self._request_timeout = request_timeout
         self._http_client = http_client
 
-    async def generate_structured(
-        self, *, system_prompt: str, user_prompt: str,
-        response_schema: dict[str, Any], timeout: float = 180.0,
-        temperature: float = 0.2,
-    ) -> InferenceResult:
+    def _endpoint_and_key(self, path: str) -> tuple[str, str]:
         try:
             base = httpx.URL(self._base_url or "")
             if base.scheme not in {"http", "https"} or not base.host or base.userinfo or base.query or base.fragment:
@@ -73,30 +74,66 @@ class ArgusCoreClient:
                 raise ValueError
             if not 0 < self._request_timeout <= 600:
                 raise ValueError
-            endpoint = str(base).rstrip("/") + "/api/v1/ai/generate"
+            return str(base).rstrip("/") + path, key
         except (ValueError, TypeError, httpx.InvalidURL):
             raise CoreClientError(503, "Argus-Core integration is not configured correctly.") from None
 
+    async def _post(self, path: str, payload: dict, operation: str) -> httpx.Response:
+        endpoint, key = self._endpoint_and_key(path)
+        try:
+            if self._http_client is not None:
+                return await self._http_client.post(
+                    endpoint, json=payload, headers={"X-API-Key": key},
+                    timeout=self._request_timeout, follow_redirects=False,
+                )
+            async with httpx.AsyncClient(trust_env=False) as client:
+                return await client.post(
+                    endpoint, json=payload, headers={"X-API-Key": key},
+                    timeout=self._request_timeout, follow_redirects=False,
+                )
+        except httpx.TimeoutException:
+            raise CoreClientError(504, f"{operation} request timed out.") from None
+        except httpx.HTTPError:
+            detail = "Argus-Core inference request failed." if operation == "AI inference" else "Argus-Core discovery request failed."
+            raise CoreClientError(502, detail) from None
+
+    async def discover_google_news(self, *, query: str, limit: int = 10) -> CoreDiscoveryResult:
+        try:
+            payload = GoogleNewsDiscoveryRequest(query=query, limit=limit)
+        except (ValueError, TypeError):
+            raise CoreClientError(422, "Discovery requires a nonempty query of at most 1000 characters and a limit of 1-75.") from None
+        response = await self._post("/api/v1/discovery", payload.model_dump(), "Discovery")
+        retry_after = validated_retry_after(response.headers.get("Retry-After"))
+        failures = {
+            401: (502, "Argus-Core authentication failed."),
+            403: (502, "Argus-Core discovery permission denied."),
+            429: (429, "Discovery rate limit exceeded."),
+            503: (503, "Discovery service unavailable."),
+            504: (504, "Discovery request timed out."),
+        }
+        if response.status_code in failures:
+            status, detail = failures[response.status_code]
+            raise CoreClientError(status, detail, retry_after if status in {429, 503} else None)
+        if response.status_code != 200:
+            raise CoreClientError(502, "Argus-Core discovery request failed.", retry_after)
+        try:
+            result = CoreDiscoveryResult.model_validate_json(response.content)
+            if len(result.candidates) > payload.limit:
+                raise ValueError
+            return result
+        except (ValueError, TypeError):
+            raise CoreClientError(502, "Argus-Core returned an invalid discovery response.") from None
+
+    async def generate_structured(
+        self, *, system_prompt: str, user_prompt: str,
+        response_schema: dict[str, Any], timeout: float = 180.0,
+        temperature: float = 0.2,
+    ) -> InferenceResult:
         payload = {
             "system_prompt": system_prompt, "user_prompt": user_prompt,
             "response_schema": response_schema, "timeout": timeout, "temperature": temperature,
         }
-        try:
-            if self._http_client is not None:
-                response = await self._http_client.post(
-                    endpoint, json=payload, headers={"X-API-Key": key},
-                    timeout=self._request_timeout, follow_redirects=False,
-                )
-            else:
-                async with httpx.AsyncClient(trust_env=False) as client:
-                    response = await client.post(
-                        endpoint, json=payload, headers={"X-API-Key": key},
-                        timeout=self._request_timeout, follow_redirects=False,
-                    )
-        except httpx.TimeoutException:
-            raise CoreClientError(504, "AI inference request timed out.") from None
-        except httpx.HTTPError:
-            raise CoreClientError(502, "Argus-Core inference request failed.") from None
+        response = await self._post("/api/v1/ai/generate", payload, "AI inference")
 
         retry_after = validated_retry_after(response.headers.get("Retry-After"))
         failures = {
@@ -128,6 +165,14 @@ class ArgusCoreClient:
 
 
 def get_core_inference_client() -> CoreInferenceClient:
+    return ArgusCoreClient(
+        base_url=global_chess_settings.core_base_url,
+        api_key=global_chess_settings.core_api_key,
+        request_timeout=global_chess_settings.core_request_timeout,
+    )
+
+
+def get_core_discovery_client() -> CoreDiscoveryClient:
     return ArgusCoreClient(
         base_url=global_chess_settings.core_base_url,
         api_key=global_chess_settings.core_api_key,

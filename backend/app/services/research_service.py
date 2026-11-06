@@ -5,12 +5,13 @@ import logging
 import time
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
-from urllib.parse import urlsplit, quote_plus
+from urllib.parse import urlsplit
 
 import feedparser
 import httpx
 import re
 
+from app.clients.argus_core_client import CoreClientError, CoreDiscoveryClient, get_core_discovery_client
 from app.config import FEEDS
 from app.services.rss_service import normalize_url, parse_published
 from app.services.ollama_service import classify_article_relevance
@@ -243,86 +244,25 @@ def discover_rss_sources(
     return ranked[:limit]
 
 
+class ResearchDiscoveryError(CoreClientError):
+    """Explicit provider failure carrying already accepted RSS evidence."""
+
+    def __init__(self, error: CoreClientError, partial_sources: list[dict]):
+        super().__init__(error.status_code, error.detail, error.retry_after)
+        self.partial_sources = partial_sources
+
+
 async def discover_google_news_sources(
     query: str,
     limit: int = 10,
+    *,
+    discovery_client: CoreDiscoveryClient | None = None,
 ) -> list[dict]:
-    """Discover topic-specific articles through Google News RSS."""
-
-    search_url = (
-        "https://news.google.com/rss/search?"
-        f"q={quote_plus(query)}&hl=en-US&gl=US&ceid=US:en"
+    """Adapt authenticated Core candidates into Global Chess research records."""
+    result = await (discovery_client or get_core_discovery_client()).discover_google_news(
+        query=query, limit=limit,
     )
-
-    try:
-        async with httpx.AsyncClient(
-            timeout=20.0,
-            headers={"User-Agent": "GlobalChessResearch/1.0"},
-            follow_redirects=True,
-        ) as client:
-            response = await client.get(search_url)
-            response.raise_for_status()
-
-        feed = feedparser.parse(response.content)
-
-        if getattr(feed, "bozo", False) and not feed.entries:
-            logger.warning("Could not parse Google News RSS")
-            return []
-
-        candidates = []
-        seen_urls = set()
-
-        for entry in feed.entries:
-            title = (entry.get("title") or "").strip()
-            link = (entry.get("link") or "").strip()
-
-            if not title or not link:
-                continue
-
-            if not link.startswith(("https://", "http://")):
-                continue
-
-            url = normalize_url(link)
-
-            if not url or url in seen_urls:
-                continue
-
-            seen_urls.add(url)
-
-            source = entry.get("source") or {}
-
-            candidates.append({
-                "title": title[:1000],
-                "url": url[:2048],
-                "publisher": (
-                    source.get("title") or "Google News"
-                )[:255],
-                "published_at": parse_published(entry),
-                "snippet": (
-                    entry.get("summary")
-                    or entry.get("description")
-                    or None
-                ),
-                "source_type": "google_news",
-            })
-
-            if len(candidates) >= limit:
-                break
-
-        logger.info(
-            "Google News discovered %s candidates for: %s",
-            len(candidates),
-            query,
-        )
-
-        return candidates
-
-    except httpx.HTTPError:
-        logger.exception("Google News request failed")
-        return []
-    except Exception:
-        logger.exception("Google News discovery failed")
-        return []
+    return result.research_sources()
 
 
 async def _wait_for_gdelt_slot() -> bool:
@@ -416,6 +356,8 @@ async def discover_sources(
     metrics: dict[str, int] | None = None,
     review_queue: list[dict] | None = None,
     processed_urls: set[str] | None = None,
+    *,
+    discovery_client: CoreDiscoveryClient | None = None,
 ) -> list[dict]:
     
     """Discover, classify, and rank sources for a research topic."""
@@ -500,6 +442,9 @@ async def discover_sources(
                     "rationale": result.rationale,
                 }
 
+                if "provider_metadata" in item:
+                    review_item["provider_metadata"] = item["provider_metadata"]
+
                 if url not in reviewed_urls:
                     review_queue.append(review_item)
                     reviewed_urls.add(url)
@@ -516,10 +461,17 @@ async def discover_sources(
 
     await classify_candidates(rss_candidates)
 
-    google_news_candidates = await discover_google_news_sources(
-        query=query,
-        limit=candidate_limit,
-    )
+    provider_error = None
+    try:
+        google_news_candidates = await discover_google_news_sources(
+            query=query,
+            limit=candidate_limit,
+            discovery_client=discovery_client,
+        )
+    except CoreClientError as exc:
+        # Preserve RSS selection, but never disguise a failed request as empty.
+        provider_error = exc
+        google_news_candidates = []
 
     metrics["google_news_candidates"] += len(
         google_news_candidates
@@ -636,4 +588,6 @@ async def discover_sources(
     for item in selected:
         item.pop("_relevance", None)
 
+    if provider_error is not None:
+        raise ResearchDiscoveryError(provider_error, selected) from None
     return selected

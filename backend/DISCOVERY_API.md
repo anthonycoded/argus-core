@@ -2,7 +2,8 @@
 
 `POST /api/v1/discovery` returns source candidates without registering articles,
 extracting full text, classifying relevance, or modifying topics. Global Chess's
-existing RSS/Google News/GDELT paths are unchanged. No migration is required.
+Google News research integration uses this API; RSS/GDELT remain separate. See
+GLOBAL_CHESS_CORE_INTEGRATION.md. No migration is required.
 
 ## Request and response
 

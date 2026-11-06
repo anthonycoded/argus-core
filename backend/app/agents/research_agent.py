@@ -1,6 +1,6 @@
 import logging
 
-from app.clients.argus_core_client import CoreClientError, CoreInferenceClient, get_core_inference_client
+from app.clients.argus_core_client import CoreClientError, CoreDiscoveryClient, CoreInferenceClient, get_core_inference_client
 from app.schemas import ResearchAgentResult
 from app.services.synthesis_service import synthesize_research
 from app.services.research_planner import (
@@ -10,6 +10,7 @@ from app.services.research_planner import (
 from app.services.research_service import (
     discover_sources,
     new_research_metrics,
+    ResearchDiscoveryError,
 )
 
 logger = logging.getLogger(__name__)
@@ -21,6 +22,7 @@ async def run_research_agent(
     sources_per_query: int = 5,
     *,
     inference_client: CoreInferenceClient | None = None,
+    discovery_client: CoreDiscoveryClient | None = None,
 ) -> ResearchAgentResult:
 
     if not topic.strip():
@@ -40,6 +42,7 @@ async def run_research_agent(
 
     decision_history = []
     limitations = []
+    discovery_failed = False
 
     # --------------------------------------------------
     # 1. Generate research plan
@@ -90,13 +93,22 @@ async def run_research_agent(
 
             logger.info("Searching for: %s", query)
 
-            discovered = await discover_sources(
-                query=query,
-                limit=sources_per_query,
-                metrics=metrics,
-                review_queue=review_queue,
-                processed_urls=processed_urls,
-            )
+            try:
+                discovered = await discover_sources(
+                    query=query,
+                    limit=sources_per_query,
+                    metrics=metrics,
+                    review_queue=review_queue,
+                    processed_urls=processed_urls,
+                    discovery_client=discovery_client,
+                )
+            except ResearchDiscoveryError as exc:
+                discovered = exc.partial_sources
+                discovery_failed = True
+                detail = "Google News discovery incomplete: " + exc.detail
+                if exc.retry_after is not None:
+                    detail += f" Retry-After: {exc.retry_after}."
+                limitations.append(detail)
 
             for source in discovered:
 
@@ -105,7 +117,13 @@ async def run_research_agent(
                 if url:
                     all_sources[url] = source
 
+            if discovery_failed:
+                break
+
         current_sources = list(all_sources.values())
+
+        if discovery_failed:
+            break  # Preserve evidence; do not issue more Core requests after failure.
 
         logger.info(
             "Total unique sources discovered: %s",
@@ -227,7 +245,7 @@ async def run_research_agent(
 
     synthesis = None
 
-    if final_sources:
+    if final_sources and not discovery_failed:
         try:
             synthesis = await synthesize_research(
                 topic=topic,

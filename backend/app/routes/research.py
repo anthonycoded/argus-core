@@ -1,14 +1,16 @@
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 import httpx
 
 from app.database import get_db
+from app.clients.argus_core_client import CoreClientError, CoreDiscoveryClient, get_core_discovery_client
 from app.models import ResearchSource, Topic
 from app.services.research_service import (
     discover_sources,
     new_research_metrics,
+    ResearchDiscoveryError,
 )
 import logging
 
@@ -20,8 +22,10 @@ router = APIRouter(prefix="/topics", tags=["Research"])
 @router.post("/{topic_id}/research")
 async def research_topic(
     topic_id: int,
+    response: Response,
     limit: int = Query(10, ge=1, le=25),
     db: Session = Depends(get_db),
+    discovery_client: CoreDiscoveryClient = Depends(get_core_discovery_client),
 ):
     topic = db.get(Topic, topic_id)
 
@@ -48,7 +52,24 @@ async def research_topic(
             limit=limit,
             metrics=metrics,
             review_queue=review_queue,
+            discovery_client=discovery_client,
         )
+    except ResearchDiscoveryError as exc:
+        if not exc.partial_sources and not review_queue:
+            raise HTTPException(
+                status_code=exc.status_code, detail=exc.detail,
+                headers={"Retry-After": exc.retry_after} if exc.retry_after is not None else None,
+            ) from None
+        discovered = exc.partial_sources
+        response.headers["X-Research-Partial"] = "true"
+        response.headers["X-Research-Discovery-Status"] = str(exc.status_code)
+        if exc.retry_after is not None:
+            response.headers["Retry-After"] = exc.retry_after
+    except CoreClientError as exc:
+        raise HTTPException(
+            status_code=exc.status_code, detail=exc.detail,
+            headers={"Retry-After": exc.retry_after} if exc.retry_after is not None else None,
+        ) from None
     except httpx.HTTPError as exc:
         raise HTTPException(
             status_code=502,
@@ -82,7 +103,9 @@ async def research_topic(
                 db.add(
                     ResearchSource(
                         topic_id=topic.id,
-                        **item,
+                        **{field: item[field] for field in (
+                            "title", "url", "publisher", "published_at", "snippet", "source_type",
+                        ) if field in item},
                     )
                 )
                 inserted += 1
