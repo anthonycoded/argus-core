@@ -12,6 +12,7 @@ def create_app(
     version: str | None = None,
     routers: Sequence[APIRouter] = (),
     initialize_database: Callable[[], None] | None = None,
+    check_database: Callable[[], Awaitable[None]] | None = None,
     on_shutdown: Callable[[], Awaitable[None]] | None = None,
     audit_session_factory: Callable | None = None,
 ) -> FastAPI:
@@ -21,6 +22,8 @@ def create_app(
         try:
             if initialize_database is not None:
                 initialize_database()
+            if check_database is not None:
+                await check_database()
             yield
         finally:
             if on_shutdown is not None:

@@ -58,9 +58,11 @@ research sources and story clusters) remain excluded from autogeneration. The
 filter is not an authorization boundary for arbitrary handwritten SQL; review new
 revision operations for Core-only ownership.
 
-Application startup still uses create_all(); removing startup DDL and introducing
-schema readiness checks is a separate change. Migration bootstrap tests explicitly
-forbid create_all() and do not use the application integration fixture.
+Core startup now validates connectivity, revision and table presence read-only;
+it never creates schemas or runs migrations. See backend/DATABASE_STARTUP.md for
+the provision -> migrate -> start deployment sequence. Global Chess retains its
+separate initialization. Migration/bootstrap/readiness tests explicitly forbid
+create_all() and do not use the application integration fixture.
 
 Automated verification
 ----------------------
