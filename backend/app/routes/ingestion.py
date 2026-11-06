@@ -23,6 +23,8 @@ def ingest_topics(db: Session = Depends(get_db)):
     inserted = 0
     updated = 0
     feed_errors = []
+    # Include pending inserts: SELECT cannot see them with autoflush disabled.
+    topics_by_url: dict[str, Topic] = {}
 
     for source, feed_url in FEEDS.items():
         try:
@@ -50,9 +52,12 @@ def ingest_topics(db: Session = Depends(get_db)):
                     published_at,
                 )
 
-                existing = db.scalar(
-                    select(Topic).where(Topic.url == url)
-                )
+                existing = topics_by_url.get(url)
+                first_observation = existing is None
+                if first_observation:
+                    existing = db.scalar(
+                        select(Topic).where(Topic.url == url)
+                    )
 
                 if existing:
                     # Preserve existing editorial status and summary.
@@ -63,22 +68,23 @@ def ingest_topics(db: Session = Depends(get_db)):
                     existing.relevance_score = relevance
                     existing.freshness_score = freshness
                     existing.score = score
-                    updated += 1
+                    if first_observation:
+                        updated += 1
                 else:
-                    db.add(
-                        Topic(
-                            title=title[:500],
-                            url=url,
-                            source=source,
-                            published_at=published_at,
-                            relevance_score=relevance,
-                            freshness_score=freshness,
-                            score=score,
-                            status="candidate",
-                            summary=None,
-                        )
+                    existing = Topic(
+                        title=title[:500],
+                        url=url,
+                        source=source,
+                        published_at=published_at,
+                        relevance_score=relevance,
+                        freshness_score=freshness,
+                        score=score,
+                        status="candidate",
+                        summary=None,
                     )
+                    db.add(existing)
                     inserted += 1
+                topics_by_url[url] = existing
 
         except Exception as exc:
             feed_errors.append({
