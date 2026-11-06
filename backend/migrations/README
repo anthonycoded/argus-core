@@ -1,1 +1,85 @@
-Generic single-database configuration.
+Argus-Core migration ownership and bootstrap
+===========================================
+
+Graph:
+
+  base
+    -> 3f1a9c2d7e60  historical core_sources table and nonunique hash index
+    -> 8d3f39d3a946  unique partial content_hash index
+    -> 8bd61bcfd002  applications and API keys
+    -> dea3e0498bf6  audit logs (unchanged head)
+
+The original root assumed that core_sources already existed. The new predecessor
+reconstructs that historical schema, including ix_core_sources_content_hash;
+the existing index revision then replaces it. No existing revision ID or upgrade/
+downgrade body was changed. Only the original root's parent metadata changed.
+Columns use the historical definitions; Python-side ORM defaults are not silently
+converted to PostgreSQL server defaults. No deduplication or data cleanup occurs.
+
+Compatibility and release precautions
+-------------------------------------
+
+An existing database recorded at dea3e0498bf6 stays at head. Alembic does not replay
+the new ancestor; an upgrade to head performs no schema/data operations there.
+The same holds for the ancestor portion of databases recorded at the existing
+root/application revision; only their subsequent migrations run. Tests reconstruct
+the original graph independently and verify all three existing revisions.
+
+Changing ancestry is a deliberate historical-metadata repair, not a new release
+head. Deploy the complete repaired script set together. Older checkouts cannot
+resolve the new baseline ID, so do not mix migration runners from different script
+sets. Obtain release approval if published migration metadata is immutable under
+your deployment policy. Rehearse on an isolated backup restore before deployment.
+
+An unversioned populated database is NOT automatically adopted. Do not blindly stamp
+it, rerun the original root, or add IF NOT EXISTS to conceal incompatible objects.
+Inventory and separately review adoption for such databases. The inspected local
+studio-ai database was already at head and matched the models; this repair requires
+no stamping, table recreation, or data change there. It was not used by these tests.
+
+Downgrade semantics change at the new boundary: downgrading all the way to base now
+drops core_sources as well as the other Core tables. That is destructive; the
+automated round trip is ONLY for disposable databases. Never use downgrade-to-base
+as a repair procedure on a populated database.
+
+Target selection and ownership
+------------------------------
+
+alembic.ini resolves backend imports relative to the repository, independent of
+the caller's working directory. Install the pinned Alembic requirement first.
+An explicit sqlalchemy.url configuration takes precedence over application
+settings. Otherwise DATABASE_URL/backend/.env selection behaves as before.
+Programmatic callers can supply config.attributes['connection']; this uses only
+that connection and does not open another database connection. Do not place secrets
+in tracked configuration files. Verify the selected target before any migration.
+
+CoreBase alone supplies target metadata. Global Chess tables (topics, analyses,
+research sources and story clusters) remain excluded from autogeneration. The
+filter is not an authorization boundary for arbitrary handwritten SQL; review new
+revision operations for Core-only ownership.
+
+Application startup still uses create_all(); removing startup DDL and introducing
+schema readiness checks is a separate change. Migration bootstrap tests explicitly
+forbid create_all() and do not use the application integration fixture.
+
+Automated verification
+----------------------
+
+Run backend/tests/integration/test_migration_bootstrap.py before application tests.
+Set ARGUS_CORE_TEST_DATABASE_URL to the dedicated disposable argus_core_test
+PostgreSQL control database and DATABASE_URL to an isolated target or sqlite://
+for test collection. Never point either variable at development/production.
+
+The migration fixture verifies current_database(), requires CREATEDB, and provisions
+a new empty argus_core_migration_test_<uuid> database for each scenario. It checks
+the new database identity and removes only the database it created. There is no
+fallback to studio-ai or to the create_all()-based integration fixture. Cleanup
+does not force-disconnect other clients; connection leaks fail visibly.
+
+Coverage includes empty installation through the entire Alembic chain, the old
+nonunique baseline index, metadata equivalence, original-root/application/head
+compatibility, populated Core/Global Chess data preservation, no writes/DDL on an
+existing head, ownership-aware autogeneration checks, isolated downgrade ownership,
+duplicate rejection without data mutation, explicit URL selection, and CLI startup
+from the repository root. Existing-head fixtures use temporary copies of the old
+graph with its original parent pointer, not the repaired bootstrap.

@@ -1,5 +1,6 @@
 annotated-doc==0.0.5
 annotated-types==0.8.0
+alembic==1.20.1
 # SSRF transport compatibility: keep AnyIO/HTTPX/httpcore exactly pinned.
 # See backend/ARTICLE_FETCH_SECURITY.md before upgrading this trio.
 anyio==4.15.1

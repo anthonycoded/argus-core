@@ -10,6 +10,7 @@ from app.core.models import (
     APIKeyDB,
     ApplicationDB,
     SourceRecordDB,
+    AuditLogDB,
 )  # noqa: F401
 
 config = context.config
@@ -42,7 +43,14 @@ def include_object(
     return True
 
 
-database_url = settings.database_url
+provided_connection = config.attributes.get("connection")
+database_url = config.get_main_option("sqlalchemy.url")
+if not database_url:
+    database_url = (
+        provided_connection.engine.url.render_as_string(hide_password=False)
+        if provided_connection is not None
+        else settings.database_url
+    )
 
 if not database_url:
     raise RuntimeError("DATABASE_URL is missing from the Argus-Core environment.")
@@ -67,23 +75,32 @@ def run_migrations_offline() -> None:
         context.run_migrations()
 
 
+def migrate_connection(connection) -> None:
+    context.configure(
+        connection=connection,
+        target_metadata=target_metadata,
+        compare_type=True,
+        include_object=include_object,
+    )
+
+    with context.begin_transaction():
+        context.run_migrations()
+
+
 def run_migrations_online() -> None:
+    if provided_connection is not None:
+        migrate_connection(provided_connection)
+        return
     connectable = engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )
-
-    with connectable.connect() as connection:
-        context.configure(
-            connection=connection,
-            target_metadata=target_metadata,
-            compare_type=True,
-            include_object=include_object,
-        )
-
-        with context.begin_transaction():
-            context.run_migrations()
+    try:
+        with connectable.connect() as connection:
+            migrate_connection(connection)
+    finally:
+        connectable.dispose()
 
 
 if context.is_offline_mode():

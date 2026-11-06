@@ -2,7 +2,7 @@
 """add unique content hash index
 
 Revision ID: 8d3f39d3a946
-Revises:
+Revises: 3f1a9c2d7e60
 Create Date: 2026-11-04
 """
 
@@ -10,7 +10,7 @@ from alembic import op
 import sqlalchemy as sa
 
 revision = "8d3f39d3a946"
-down_revision = None
+down_revision = "3f1a9c2d7e60"
 branch_labels = None
 depends_on = None
 
