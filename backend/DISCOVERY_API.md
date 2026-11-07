@@ -2,6 +2,7 @@
 
 The same endpoint additionally supports approved RSS feed IDs, immutable snapshots
 and pagination; see RSS_DISCOVERY.md. The Google News contract below is unchanged.
+It also accepts the default-disabled GDELT branch described in GDELT_DISCOVERY.md.
 
 `POST /api/v1/discovery` returns source candidates without registering articles,
 extracting full text, classifying relevance, or modifying topics. Global Chess's

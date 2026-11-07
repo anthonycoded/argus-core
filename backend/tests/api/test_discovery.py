@@ -143,7 +143,7 @@ async def test_redis_failure_fails_closed(context):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("payload", [{"query": ""}, {"query": "x", "limit": 0}, {"query": "x", "limit": 76},
-    {"query": "x", "provider": "gdelt"}, {"query": "x", "fetch_url": "http://127.0.0.1/"}])
+    {"query": "x", "provider": "unsupported"}, {"query": "x", "fetch_url": "http://127.0.0.1/"}])
 async def test_api_rejects_invalid_inputs_without_fetching(context, payload):
     response = await post(context, payload)
     assert response.status_code == 422 and context["requests"] == []

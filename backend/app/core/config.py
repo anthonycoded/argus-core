@@ -18,6 +18,9 @@ class Settings(BaseSettings):
     ollama_base_url: str = "http://localhost:12400"
     ollama_model: str = "qwen2.5:3b"
 
+    # Explicit operator opt-in; never enabled by a discovery request.
+    gdelt_enabled: bool = False
+
     model_config = SettingsConfigDict(
         env_file=ENV_FILE,
         env_file_encoding="utf-8",
