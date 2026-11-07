@@ -20,7 +20,9 @@ runs blocking checks in a worker thread and requires:
 - Exactly one deployed Alembic head and exactly that revision in
   `public.alembic_version`.
 - All tables registered in CoreBase, currently core_sources, core_applications,
-  core_api_keys and core_audit_logs, in public.
+  core_api_keys, core_audit_logs, core_source_catalogs and
+  core_source_admission_events, in public. The admission tables may be empty;
+  startup does not provision a registry identity or approve any sources.
 
 Database inspection uses a REPEATABLE READ, READ ONLY PostgreSQL transaction and
 rolls back on connection close. SQLAlchemy resets checkout characteristics before

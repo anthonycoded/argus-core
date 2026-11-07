@@ -4,7 +4,6 @@ Never uses postgres_test_engine: that fixture initializes tables with create_all
 """
 
 import os
-import re
 import shutil
 import subprocess
 import sys
@@ -17,7 +16,7 @@ from alembic.autogenerate import compare_metadata
 from alembic.config import Config
 from alembic.migration import MigrationContext
 from alembic.script import ScriptDirectory
-from sqlalchemy import event, inspect, select, text
+from sqlalchemy import inspect, select, text
 from sqlalchemy.exc import IntegrityError
 
 from app import models as chess_models
@@ -28,8 +27,9 @@ ROOT = Path(__file__).resolve().parents[3]
 MIGRATIONS = ROOT / "backend/migrations"
 BASELINE = "3f1a9c2d7e60"
 OLD_ROOT = "8d3f39d3a946"
-HEAD = "dea3e0498bf6"
-OLD_REVISIONS = (OLD_ROOT, "8bd61bcfd002", HEAD)
+PRE_ADMISSION_HEAD = "dea3e0498bf6"
+HEAD = "61c2a9e47b30"
+OLD_REVISIONS = (OLD_ROOT, "8bd61bcfd002", PRE_ADMISSION_HEAD)
 
 
 def configuration(connection=None, location=MIGRATIONS):
@@ -120,7 +120,7 @@ def test_migration_graph_preserves_existing_revision_ids():
     scripts = ScriptDirectory.from_config(configuration())
     assert scripts.get_bases() == [BASELINE]
     assert scripts.get_heads() == [HEAD]
-    assert [revision.revision for revision in scripts.walk_revisions()] == [HEAD, OLD_REVISIONS[1], OLD_ROOT, BASELINE]
+    assert [revision.revision for revision in scripts.walk_revisions()] == [HEAD, PRE_ADMISSION_HEAD, OLD_REVISIONS[1], OLD_ROOT, BASELINE]
 
 
 def test_empty_postgres_initializes_entirely_through_alembic(migration_engine):
@@ -162,20 +162,13 @@ def test_existing_revision_preserves_core_and_chess_data(migration_engine, tmp_p
         seed_core(connection)
         existing = (set(CoreBase.metadata.tables) | set(Base.metadata.tables)) & set(inspect(connection).get_table_names())
         before = snapshot(connection, existing)
-    statements = []
-    def capture(conn, cursor, statement, parameters, context, executemany):
-        statements.append(statement)
-    event.listen(migration_engine, "before_cursor_execute", capture)
-    try:
-        with migration_engine.begin() as connection:
-            command.upgrade(configuration(connection), "head")
-    finally:
-        event.remove(migration_engine, "before_cursor_execute", capture)
-    if old_revision == HEAD:
-        assert not any(re.match(r"\s*(CREATE|ALTER|DROP|INSERT|UPDATE|DELETE|TRUNCATE)\b", s, re.I) for s in statements)
+    with migration_engine.begin() as connection:
+        command.upgrade(configuration(connection), "head")
     with migration_engine.begin() as connection:
         assert snapshot(connection, existing) == before
         assert_core_matches(connection)
+        assert connection.execute(text("SELECT count(*) FROM core_source_catalogs")).scalar_one() == 0
+        assert connection.execute(text("SELECT count(*) FROM core_source_admission_events")).scalar_one() == 0
         # Exercise env.py's actual ownership filter with populated Chess tables.
         command.check(configuration(connection))
 

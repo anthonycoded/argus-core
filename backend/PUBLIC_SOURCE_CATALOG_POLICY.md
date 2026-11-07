@@ -1,9 +1,13 @@
 # Phase 5D.2A: offline public-source catalog policy
 
-`app.core.source_catalog` is a pure policy/decision library. No route, service,
-client, model, startup, migration, configuration or persistence path uses it yet.
+`app.core.source_catalog` is a pure policy/decision library. Phase 5D.2B.1's internal
+admission infrastructure reuses its strict facts contracts; no live route, client,
+or startup path applies its admission, projection or identity decisions yet.
 It does not connect, resolve DNS, fetch, register, merge, update or publish records.
 Global Chess automatic registration remains disabled.
+
+Durable storage mechanics and their remaining authority boundary are documented
+in [SOURCE_ADMISSION_INFRASTRUCTURE.md](SOURCE_ADMISSION_INFRASTRUCTURE.md).
 
 ## Trust and public facts
 
@@ -119,22 +123,17 @@ including after uniqueness races, rather than choosing one constraint's winner.
 
 ## Admission storage and legacy adoption: unresolved deployment decisions
 
-There is currently no durable admission authority. This phase deliberately stops
-at pure typed inputs; it does not mark any actual record public.
+There is currently no provisioned admission authority. Phase 5D.2B.1 implements
+separate Core-owned catalog identity and append-only admission-event tables, with
+internal transactional mechanics. These replace the earlier marker-versus-review-
+table design options without adding columns to existing source rows. Their FKs
+stay within Core. The policy library itself still performs no persistence.
 
-Two options require a separate design/implementation decision:
-
-* A server-controlled marker on `core_sources` is small and easy to filter, but
-  needs policy/reviewer/version history beyond a boolean and mixes review state
-  with existing source facts. A caller-supplied JSON metadata flag is not a marker.
-* A separate Core-owned review/admission table can record source ID, state, policy
-  revision, reviewer/time and algorithm attestation while keeping existing source
-  facts intact. Its internal FK would remain inside Core, never across applications.
-
-Recommend the separate admission/review table for explicit adoption and provenance
-history. Exact history/current-state mechanics and who may admit/revoke records
-remain unresolved and must be approved before implementation. No DDL is proposed
-as executable migration here, and no legacy record is assumed public.
+Who may admit/revoke records and how an operator proves authority remain unresolved.
+No ordinary request can construct a trusted execution context through an existing
+API. Storage does not enforce live source visibility, and no legacy record is
+assumed public. See the infrastructure document for migration, role separation,
+canonical snapshots, reconciliation and downgrade restrictions.
 
 Adoption must inventory data under separate authorization, preserve original rows
 and IDs, classify projected fields and sensitive URLs, default to unreviewed, and
