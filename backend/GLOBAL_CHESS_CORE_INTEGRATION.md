@@ -285,3 +285,10 @@ incomplete/expired/failed coverage, retaining accepted partial entries. Retry-Af
 guidance is validated and included per feed, without retries. No direct RSS fallback
 exists. Provenance is transient under the existing Topic schema. See
 INGESTION_CHARACTERIZATION.md for strict-parser/date compatibility changes and limits.
+
+## Source identity interface (not wired into research)
+
+The optional Global Chess source client supports authenticated registration and
+lookup with typed identity verification and explicit write uncertainty. No workflow
+registers sources automatically. See [GLOBAL_CHESS_SOURCE_IDENTITY.md](GLOBAL_CHESS_SOURCE_IDENTITY.md)
+for scopes, conflicts, privacy boundaries and immutable-evidence requirements.
