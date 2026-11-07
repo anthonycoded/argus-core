@@ -34,9 +34,12 @@ def test_database_dependencies_and_core_readiness_are_independent(migration_engi
         with target.connect() as connection:
             assert connection.execute(text("SELECT current_database()")).scalar_one()==name
             assert inspect(connection).get_table_names()==[]
-        # This intermediate application has no migrations yet. Explicit fixture
-        # table creation stays in this empty disposable target; never Core's DB.
-        for table in chess_db.Base.metadata.sorted_tables:table.create(target)
+        # Initialize solely through the application-owned migration history.
+        from app.global_chess_readiness import MIGRATIONS as CHESS_MIGRATIONS, VERSION_TABLE, validate_global_chess_database
+        with target.begin() as connection:
+            cfg=Config();cfg.set_main_option("script_location",str(CHESS_MIGRATIONS));cfg.attributes["connection"]=connection
+            command.upgrade(cfg,"head")
+        validate_global_chess_database(target)
         monkeypatch.setattr(chess_db,"SessionLocal",sessionmaker(bind=target,autoflush=False,autocommit=False))
         monkeypatch.setattr(core_db,"SessionLocal",sessionmaker(bind=migration_engine,autoflush=False,autocommit=False))
 
@@ -58,7 +61,7 @@ def test_database_dependencies_and_core_readiness_are_independent(migration_engi
             assert set(inspect(connection).get_table_names())==set(CoreBase.metadata.tables)|{"alembic_version"}
             assert connection.execute(select(ApplicationDB.id)).scalar_one()=="synthetic-core-app"
         with target.connect() as connection:
-            assert set(inspect(connection).get_table_names())==set(chess_db.Base.metadata.tables)
+            assert set(inspect(connection).get_table_names())==set(chess_db.Base.metadata.tables)|{VERSION_TABLE}
             assert connection.execute(select(models.Topic.status,models.Topic.summary)).one()==("approved","Preserved")
 
         statements=[]
@@ -68,7 +71,7 @@ def test_database_dependencies_and_core_readiness_are_independent(migration_engi
         finally:event.remove(migration_engine,"before_cursor_execute",record)
         assert statements and all(re.match(r"\s*(SELECT|SHOW)\b",sql,re.I) for sql in statements)
         with target.connect() as connection:
-            assert set(inspect(connection).get_table_names())==set(chess_db.Base.metadata.tables)
+            assert set(inspect(connection).get_table_names())==set(chess_db.Base.metadata.tables)|{VERSION_TABLE}
     finally:
         if target is not None:target.dispose()
         if created:

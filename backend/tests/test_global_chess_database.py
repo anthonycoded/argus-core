@@ -150,14 +150,15 @@ async def test_actual_chess_lifespan_disposes_only_chess_engine(monkeypatch,star
     core_dispose = Mock(side_effect=AssertionError("Global Chess disposed Core"))
     monkeypatch.setattr(main,"engine",own)
     monkeypatch.setattr(core_db.engine,"dispose",core_dispose)
-    create = Mock(side_effect=RuntimeError("isolated startup failure") if startup_fails else None)
-    monkeypatch.setattr(chess_db.Base.metadata,"create_all",create)
+    check = Mock(side_effect=RuntimeError("isolated startup failure") if startup_fails else None)
+    monkeypatch.setattr(main,"validate_global_chess_database",check)
+    monkeypatch.setattr(chess_db.Base.metadata,"create_all",Mock(side_effect=AssertionError("Startup attempted schema creation")))
     if startup_fails:
         with pytest.raises(RuntimeError,match="isolated startup failure"):
             async with main.app.router.lifespan_context(main.app):pytest.fail("Startup should fail")
     else:
         async with main.app.router.lifespan_context(main.app):pass
-    create.assert_called_once_with(bind=own)
+    check.assert_called_once_with(own)
     own.dispose.assert_called_once()
     core_dispose.assert_not_called()
 

@@ -69,13 +69,16 @@ Core AI quotas/admission are operator-controlled; Global Chess never raises them
 
 ## Lifecycle and remaining limits
 
-Startup still invokes Global Chess's existing five-table `create_all()` callback.
-**This remains temporary until Phase 6E.** No migration is run or namespace/source
-identity provisioned. Shutdown invokes only Global Chess's existing owned-engine
-disposal callback, including on startup failure. Core's startup and shutdown are
-not called by this application. Phase 6B database destination selection, development
-fallback, session ownership, commits, rollback and status/summary preservation are
-unchanged. No data cutover or persistent schema operation is authorized here.
+Phase 6E replaces startup `create_all()` with the application-owned read-only
+PostgreSQL readiness gate. Startup requires explicit GLOBAL_CHESS_DATABASE_URL;
+the legacy URL parser remains for configuration compatibility but cannot choose
+a serving database. Provision a fresh database, run Global Chess's independent
+Alembic history, then start the application. No migration or source identity is
+provisioned at startup. See GLOBAL_CHESS_DATABASE.md for commands and ownership.
+Shutdown disposes only the Global Chess engine, including on startup failure.
+Core's startup/shutdown is not called. Session ownership, commits, rollback and
+status/summary preservation remain unchanged; historical data transfer is not
+required for the fresh V1 database and is not performed.
 
 Frozen pre-6C OpenAPI and pre-6B DDL fixtures protect API/schema compatibility.
 Tests block the entire Core package during fresh Global Chess startup, block Global
@@ -84,9 +87,9 @@ wire behavior, and run existing API/persistence regressions with isolated resour
 Validation supplies process settings, disables dotenv reads, and never calls live
 providers or development/production databases.
 
-Independent migrations/readiness, remaining shared normalization utilities, test
-extraction, packaging/deployment and application access protection remain future
-work. The legacy direct GDELT helper remains unused and GDELT stays disabled.
-Automatic source registration remains disabled. No authentication/API contract,
-schema, credential, environment file, repository layout or persistent data changes
-are part of this phase.
+Independent migrations/readiness now belong to Global Chess. Remaining shared
+normalization utilities, test extraction, packaging/deployment and application
+access protection still require review. The legacy direct GDELT helper remains
+unused and GDELT stays disabled. Automatic source registration remains disabled.
+This phase changes no authentication/API contracts, existing model schema,
+credentials, environment files or historical data, and creates no new repository.

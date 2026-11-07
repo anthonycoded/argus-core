@@ -166,14 +166,18 @@ def test_actual_core_lifespan_validates_and_always_shuts_down(migration_engine, 
     dispose_audit.assert_called_once()
 
 
-def test_legacy_initialization_callback_is_unchanged(monkeypatch):
+def test_global_chess_startup_no_longer_creates_schema(monkeypatch):
     from app import main
+    from app.database import Base
 
-    legacy_create_all = Mock()
-    monkeypatch.setattr(main.Base.metadata, "create_all", legacy_create_all)
+    check = Mock()
+    monkeypatch.setattr(main, "validate_global_chess_database", check)
+    forbidden = Mock(side_effect=AssertionError("Global Chess startup attempted schema creation"))
+    monkeypatch.setattr(Base.metadata, "create_all", forbidden)
     with TestClient(main.app):
         pass
-    legacy_create_all.assert_called_once_with(bind=main.engine)
+    check.assert_called_once_with(main.engine)
+    forbidden.assert_not_called()
 
 
 def test_async_readiness_failure_keeps_factory_shutdown_behavior():

@@ -189,9 +189,11 @@ import asyncio,httpx
 database.engine.dispose()
 owned=create_engine('sqlite://',poolclass=StaticPool,connect_args={'check_same_thread':False})
 main.engine=owned
+checks=[]
+main.validate_global_chess_database=lambda engine: checks.append(engine)
 async def run():
     async with main.app.router.lifespan_context(main.app):
-        assert len(inspect(owned).get_table_names())==5
+        assert checks==[owned] and inspect(owned).get_table_names()==[]
         async with httpx.AsyncClient(transport=httpx.ASGITransport(app=main.app),base_url='http://offline.test') as client:
             assert (await client.get('/health')).status_code==200
 asyncio.run(run())

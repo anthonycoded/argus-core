@@ -3,13 +3,10 @@
 
 from sqlalchemy import create_engine
 from sqlalchemy.exc import ArgumentError
-from sqlalchemy.orm import DeclarativeBase, sessionmaker
+from sqlalchemy.orm import sessionmaker
 
 from app.global_chess_config import GlobalChessDatabaseConfigurationError, global_chess_settings
-
-
-class Base(DeclarativeBase):
-    """Metadata for Global Chess's five application tables only."""
+from app.global_chess_base import Base  # Compatibility export; one metadata owner.
 
 
 DATABASE_URL = global_chess_settings.database_connection_url()
