@@ -1,15 +1,20 @@
 import logging
 from typing import Any
 import httpx
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Response
 from pydantic import BaseModel, Field
 
 from app.clients.ollama_client import OllamaClient
 from app.core.permissions import require_scopes
 from app.core.rate_limit import require_rate_limit
+from app.core.auth import AuthenticatedApplication, get_current_application
+from app.core.config import settings
+from app.core.redis import redis_client
+from app.services.ai_admission import AIAdmissionError, RedisAIAdmission, run_admitted_inference
 from app.services.rate_limiter import (
     GENERAL_API_LIMIT,
     AI_GENERATION_LIMIT,
+    RateLimit,
 )
 
 logger = logging.getLogger(__name__)
@@ -30,6 +35,20 @@ class AIRequest(BaseModel):
     timeout: float = Field(default=60.0, gt=0.0, le=180.0)
 
 
+async def require_ai_rate_limit(
+    response: Response,
+    auth: AuthenticatedApplication = Depends(get_current_application),
+):
+    quota = settings.ai_application_quota_overrides.get(auth.application.id, AI_GENERATION_LIMIT.requests)
+    limit = RateLimit(requests=quota, window_seconds=AI_GENERATION_LIMIT.window_seconds)
+    return await require_rate_limit(bucket="ai_generation", rate_limit=limit)(response, auth)
+
+
+def get_ai_admission() -> RedisAIAdmission:
+    return RedisAIAdmission(redis_client, capacity=settings.ai_max_concurrent_inferences,
+                            lease_seconds=settings.ai_inference_lease_seconds)
+
+
 @router.post("/generate")
 async def generate_ai_response(
     request: AIRequest,
@@ -40,21 +59,17 @@ async def generate_ai_response(
             rate_limit=GENERAL_API_LIMIT,
         )
     ),
-    _ai_limit=Depends(
-        require_rate_limit(
-            bucket="ai_generation",
-            rate_limit=AI_GENERATION_LIMIT,
-        )
-    ),
+    _ai_limit=Depends(require_ai_rate_limit),
+    admission=Depends(get_ai_admission),
 ):
     try:
-        payload = await ollama_client.generate_structured(
+        payload = await run_admitted_inference(admission, lambda: ollama_client.generate_structured(
             system_prompt=request.system_prompt,
             user_prompt=request.user_prompt,
             response_schema=request.response_schema,
             timeout=request.timeout,
             temperature=request.temperature,
-        )
+        ), timeout=request.timeout)
 
         content = payload["message"]["content"]
 
@@ -64,7 +79,11 @@ async def generate_ai_response(
             "result": content,
         }
 
-    except httpx.TimeoutException as exc:
+    except AIAdmissionError as exc:
+        raise HTTPException(status_code=503, detail=str(exc),
+                            headers={"Retry-After": str(exc.retry_after)}) from None
+
+    except (httpx.TimeoutException, TimeoutError) as exc:
         raise HTTPException(
             status_code=504,
             detail="AI inference request timed out.",

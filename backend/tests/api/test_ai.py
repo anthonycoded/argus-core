@@ -8,9 +8,9 @@ from app.api.v1.router import api_router
 from app.core.auth import AuthenticatedApplication, get_current_application
 from app.core.rate_limit import require_rate_limit
 from app.factory import create_app
+from app.api.v1.ai import get_ai_admission, require_ai_rate_limit
 from app.services.rate_limiter import (
     GENERAL_API_LIMIT,
-    AI_GENERATION_LIMIT,
 )
 
 
@@ -44,12 +44,10 @@ def client():
         )
     ] = lambda: test_auth
 
-    test_app.dependency_overrides[
-        require_rate_limit(
-            bucket="ai_generation",
-            rate_limit=AI_GENERATION_LIMIT,
-        )
-    ] = lambda: test_auth
+    test_app.dependency_overrides[require_ai_rate_limit] = lambda: test_auth
+    test_app.dependency_overrides[get_ai_admission] = lambda: SimpleNamespace(
+        acquire=AsyncMock(), release=AsyncMock(),
+    )
 
     with TestClient(test_app) as test_client:
         yield test_client

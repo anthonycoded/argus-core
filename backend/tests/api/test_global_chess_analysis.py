@@ -1,4 +1,5 @@
 import json
+from types import SimpleNamespace
 from textwrap import dedent
 from unittest.mock import AsyncMock
 
@@ -237,7 +238,7 @@ async def test_client_contract_with_real_core_router_and_authentication(monkeypa
     from app.factory import create_app as create_core_app
     from app.core.rate_limit import require_rate_limit
     from app.services.api_key_service import generate_api_key
-    from app.services.rate_limiter import GENERAL_API_LIMIT, AI_GENERATION_LIMIT
+    from app.services.rate_limiter import GENERAL_API_LIMIT
 
     engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
     CoreBase.metadata.create_all(engine)
@@ -256,8 +257,11 @@ async def test_client_contract_with_real_core_router_and_authentication(monkeypa
         with sessions() as db:
             yield db
     core_app.dependency_overrides[get_core_db] = request_session
-    for bucket, limit in (("general", GENERAL_API_LIMIT), ("ai_generation", AI_GENERATION_LIMIT)):
-        core_app.dependency_overrides[require_rate_limit(bucket=bucket, rate_limit=limit)] = lambda: None
+    core_app.dependency_overrides[require_rate_limit(bucket="general", rate_limit=GENERAL_API_LIMIT)] = lambda: None
+    core_app.dependency_overrides[ai.require_ai_rate_limit] = lambda: None
+    core_app.dependency_overrides[ai.get_ai_admission] = lambda: SimpleNamespace(
+        acquire=AsyncMock(), release=AsyncMock(),
+    )
     backend = AsyncMock(return_value={"model": "model-reported-by-core", "message": {"content": json.dumps(ANALYSIS)}})
     monkeypatch.setattr(ai.ollama_client, "generate_structured", backend)
     try:
