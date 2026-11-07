@@ -1,13 +1,18 @@
 import base64
+import asyncio
 import json
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
-from unittest.mock import AsyncMock
+from threading import Event as ThreadEvent
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, Mock
 
 import anyio
 import httpcore
 import httpx
 import pytest
+import pytest_asyncio
 
 from app.services.discovery import feed_registry, rss, rss_parser
 from app.services.discovery.contracts import DiscoveryError
@@ -219,24 +224,250 @@ async def test_storage_failure_fails_closed():
     fetcher.fetch.assert_not_called()
 
 
-@pytest.mark.parametrize("during_parse",[False,True])
+@pytest.fixture
+def operation_timeout(monkeypatch):
+    """Expose the real scope; each test arms its deadline at a known stage."""
+    scopes = []
+
+    @contextmanager
+    def controlled_timeout(delay):
+        assert delay == rss.OPERATION_DEADLINE
+        with anyio.fail_after(None) as scope:
+            scopes.append(scope)
+            yield scope
+
+    # Keep the change local to RSS; test safety deadlines and AnyIO stay real.
+    proxy = SimpleNamespace(fail_after=controlled_timeout, to_thread=anyio.to_thread,
+                            lowlevel=anyio.lowlevel, move_on_after=anyio.move_on_after)
+    monkeypatch.setattr(rss, "anyio", proxy)
+    return scopes
+
+
+@pytest_asyncio.fixture
+async def blocked_parser(monkeypatch):
+    loop = asyncio.get_running_loop()
+    started = anyio.Event()
+    completed = anyio.Event()
+    release = ThreadEvent()
+    finished = ThreadEvent()
+    errors = []
+
+    def parse(data, feed):
+        try:
+            anyio.from_thread.run_sync(started.set)
+            if not release.wait(5):
+                raise AssertionError("Parser safety deadline exceeded")
+            return None, "rss2", [], 0
+        except BaseException as exc:
+            errors.append(exc)
+            raise
+        finally:
+            finished.set()
+            loop.call_soon_threadsafe(completed.set)
+
+    monkeypatch.setattr(rss, "parse_rss", parse)
+    state = SimpleNamespace(started=started, completed=completed, release=release,
+                            finished=finished, errors=errors)
+    yield state
+    release.set()  # Failure paths must not leave a worker waiting indefinitely.
+
+
+def observe_parser_release(store, parser, monkeypatch):
+    releases = SimpleNamespace(lease=[], capacity=[])
+    original = store.release
+    original_capacity = rss._capacity
+
+    async def release(feed_id, token):
+        releases.lease.append(parser.finished.is_set())
+        await original(feed_id, token)
+
+    class ObservedCapacity:
+        @property
+        def borrowed_tokens(self):
+            return original_capacity.borrowed_tokens
+
+        async def __aenter__(self):
+            return await original_capacity.__aenter__()
+
+        async def __aexit__(self, *args):
+            releases.capacity.append(parser.finished.is_set())
+            return await original_capacity.__aexit__(*args)
+
+    monkeypatch.setattr(rss, "_capacity", ObservedCapacity())
+    store.release = release
+    store.publish = AsyncMock(wraps=store.publish)
+    return releases
+
+
 @pytest.mark.asyncio
-async def test_operation_timeout_releases_capacity_and_does_not_abandon_parser(monkeypatch,during_parse):
-    import time
-    from threading import Event
-    service,store,fetcher=provider();finished=Event()
-    monkeypatch.setattr(rss,"OPERATION_DEADLINE",0.01)
-    if during_parse:
-        def slow_parser(data,feed):
-            time.sleep(0.05);finished.set();return None,"rss2",[],0
-        monkeypatch.setattr(rss,"parse_rss",slow_parser)
-    else:
-        async def wait(feed):await anyio.sleep_forever()
-        fetcher.fetch.side_effect=wait
-    result=await service.discover(request(),"app")
-    assert result.status=="timeout" and not store.data and not store.leases
-    assert rss._capacity.borrowed_tokens==0
-    if during_parse:assert finished.is_set()
+async def test_operation_timeout_before_parser_start(monkeypatch, operation_timeout):
+    service, store, fetcher = provider()
+    parser = Mock(side_effect=AssertionError("Cancelled parser must never start"))
+    monkeypatch.setattr(rss, "parse_rss", parser)
+    store.publish = AsyncMock(wraps=store.publish)
+    limiter = anyio.CapacityLimiter(1)
+    dispatch = anyio.Event()
+    returned = anyio.Event()
+    results = []
+
+    async def queued_parse(func, *args):
+        dispatch.set()
+        return await anyio.to_thread.run_sync(func, *args, limiter=limiter)
+
+    rss.anyio.to_thread = SimpleNamespace(run_sync=queued_parse)
+
+    async def run():
+        results.append(await service.discover(request(), "app"))
+        returned.set()
+
+    with anyio.fail_after(5):  # Safety bound, not a parser-start scheduling assumption.
+        async with limiter:
+            async with anyio.create_task_group() as group:
+                group.start_soon(run)
+                await dispatch.wait()
+                while limiter.statistics().tasks_waiting != 1:
+                    await anyio.lowlevel.checkpoint()
+                assert rss._capacity.borrowed_tokens == 1 and len(store.leases) == 1
+                operation_timeout[0].deadline = anyio.current_time()
+                await returned.wait()
+            assert operation_timeout[0].cancel_called
+            assert results[0].status == "timeout"
+            assert not store.data and not store.leases and rss._capacity.borrowed_tokens == 0
+            assert limiter.statistics().tasks_waiting == 0
+            parser.assert_not_called()
+        # Release the worker token and run a real dispatch barrier: no cancelled
+        # waiter may resume or enqueue the parser after the request has ended.
+        await anyio.to_thread.run_sync(lambda: None, limiter=limiter)
+    parser.assert_not_called()
+    store.publish.assert_not_awaited()
+    fetcher.fetch.assert_awaited_once()
+    assert limiter.borrowed_tokens == 0
+
+
+@pytest.mark.asyncio
+async def test_operation_timeout_during_fetch_releases_capacity_and_lease(monkeypatch, operation_timeout):
+    service, store, fetcher = provider()
+    entered = anyio.Event()
+    returned = anyio.Event()
+    results = []
+    parser = Mock(side_effect=AssertionError("Timed-out fetch must not reach parsing"))
+    monkeypatch.setattr(rss, "parse_rss", parser)
+    store.publish = AsyncMock(wraps=store.publish)
+
+    async def fetch(feed):
+        entered.set()
+        await anyio.sleep_forever()
+
+    async def run():
+        results.append(await service.discover(request(), "app"))
+        returned.set()
+
+    fetcher.fetch.side_effect = fetch
+    with anyio.fail_after(5):
+        async with anyio.create_task_group() as group:
+            group.start_soon(run)
+            await entered.wait()
+            assert rss._capacity.borrowed_tokens == 1 and len(store.leases) == 1
+            operation_timeout[0].deadline = anyio.current_time()
+            await returned.wait()
+    assert operation_timeout[0].cancel_called and results[0].status == "timeout"
+    assert not store.data and not store.leases and rss._capacity.borrowed_tokens == 0
+    parser.assert_not_called()
+    store.publish.assert_not_awaited()
+    fetcher.fetch.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_operation_timeout_after_parser_start(operation_timeout, blocked_parser, monkeypatch):
+    service, store, _ = provider()
+    releases = observe_parser_release(store, blocked_parser, monkeypatch)
+    returned = anyio.Event()
+    results = []
+
+    async def run():
+        try:
+            results.append(await service.discover(request(), "app"))
+        finally:
+            returned.set()
+
+    with anyio.fail_after(5):
+        async with anyio.create_task_group() as group:
+            group.start_soon(run)
+            try:
+                await blocked_parser.started.wait()
+                assert rss._capacity.borrowed_tokens == 1 and len(store.leases) == 1
+                operation_timeout[0].deadline = anyio.current_time()
+                # Process cancellation while the worker is deliberately blocked.
+                await anyio.lowlevel.checkpoint()
+                assert operation_timeout[0].cancel_called and not returned.is_set()
+                assert not blocked_parser.finished.is_set() and not releases.lease and not releases.capacity
+                assert rss._capacity.borrowed_tokens == 1 and len(store.leases) == 1
+                store.publish.assert_not_awaited()
+            finally:
+                blocked_parser.release.set()
+            await returned.wait()
+            await blocked_parser.completed.wait()
+    assert results[0].status == "timeout" and blocked_parser.finished.is_set()
+    assert releases.lease == [True] and releases.capacity == [True] and not blocked_parser.errors
+    assert not store.data and not store.leases and rss._capacity.borrowed_tokens == 0
+    store.publish.assert_not_awaited()
+
+
+class NativeParserOwnershipReleasedEarly(Exception):
+    """Only the confirmed native-cancellation defect is an expected failure."""
+
+
+@pytest.mark.xfail(strict=True, raises=NativeParserOwnershipReleasedEarly,
+                   reason="Separate RSS runtime defect: Task.cancel releases capacity/lease before parsing finishes")
+@pytest.mark.asyncio
+async def test_native_task_cancel_retains_running_parser_ownership(blocked_parser, monkeypatch):
+    # Separate implementation task: retain parser-job ownership across native
+    # asyncio cancellation. AnyIO operation-deadline shielding is tested above.
+    # Assertion/cleanup errors are NOT xfailed; fixing the defect causes strict XPASS.
+    service, store, _ = provider()
+    releases = observe_parser_release(store, blocked_parser, monkeypatch)
+    returned = anyio.Event()
+
+    async def run():
+        try:
+            await service.discover(request(), "app")
+        finally:
+            returned.set()
+
+    task = asyncio.create_task(run())
+    try:
+        with anyio.fail_after(5):
+            try:
+                await blocked_parser.started.wait()
+                assert rss._capacity.borrowed_tokens == 1 and len(store.leases) == 1
+                assert task.cancel()
+                cancel_turn = asyncio.Event()
+                asyncio.get_running_loop().call_soon(cancel_turn.set)
+                await cancel_turn.wait()  # Run the queued cancellation step, no timed sleep.
+                assert not blocked_parser.finished.is_set()
+                known_defect = (returned.is_set() and rss._capacity.borrowed_tokens == 0
+                                and not store.leases and releases.lease == [False] and releases.capacity == [False])
+                if not known_defect:
+                    assert rss._capacity.borrowed_tokens == 1 and len(store.leases) == 1
+                    assert not releases.lease and not releases.capacity
+            finally:
+                blocked_parser.release.set()
+            with pytest.raises(asyncio.CancelledError):
+                await task
+            await blocked_parser.completed.wait()
+    finally:
+        blocked_parser.release.set()
+        if not task.done():
+            task.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await task
+    # Validate every cleanup invariant before converting precisely the known
+    # ownership failure into XFAIL. Other failures remain ordinary test failures.
+    assert blocked_parser.finished.is_set() and not blocked_parser.errors
+    assert not store.data and not store.leases and rss._capacity.borrowed_tokens == 0
+    store.publish.assert_not_awaited()
+    if known_defect:
+        raise NativeParserOwnershipReleasedEarly("Native cancellation released running parser ownership")
 
 
 @pytest.fixture
