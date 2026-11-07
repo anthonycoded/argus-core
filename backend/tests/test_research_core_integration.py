@@ -202,7 +202,7 @@ async def test_research_with_real_core_router_and_auth(operation, mode, monkeypa
     from app.api.v1.router import api_router
     from app.core.models import CoreBase, ApplicationDB, APIKeyDB
     from app.core.rate_limit import require_rate_limit
-    from app.database import get_db
+    from app.core.database import get_db
     from app.factory import create_app
     from app.services.api_key_service import generate_api_key
     from app.services.rate_limiter import GENERAL_API_LIMIT, AI_GENERATION_LIMIT

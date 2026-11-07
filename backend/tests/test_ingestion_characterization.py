@@ -24,7 +24,7 @@ from sqlalchemy.pool import NullPool, StaticPool
 from app.config import FEEDS, KEYWORDS
 from app.clients.argus_core_client import ArgusCoreClient, CoreClientError, RSSDiscoveryError, get_core_discovery_client
 from app.global_chess_config import INGESTION_RSS_FEEDS
-from app.core.database import SessionLocal, get_db
+from app.database import SessionLocal, get_db
 from app.factory import create_app
 from app.models import Topic
 from app.routes import ingestion

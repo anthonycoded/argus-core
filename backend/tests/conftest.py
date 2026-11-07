@@ -53,7 +53,7 @@ def migration_engine(monkeypatch):
     from uuid import uuid4
     from sqlalchemy.pool import NullPool
     from app.core.config import settings
-    from app.core.database import Base
+    from app.database import Base
 
     raw = os.getenv("ARGUS_CORE_TEST_DATABASE_URL")
     if not raw:

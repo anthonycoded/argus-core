@@ -233,6 +233,7 @@ async def test_client_contract_with_real_core_router_and_authentication(monkeypa
     from app.api.v1.router import api_router
     from app.api.v1 import ai
     from app.core.models import CoreBase, ApplicationDB, APIKeyDB
+    from app.core.database import get_db as get_core_db
     from app.core.rate_limit import require_rate_limit
     from app.services.api_key_service import generate_api_key
     from app.services.rate_limiter import GENERAL_API_LIMIT, AI_GENERATION_LIMIT
@@ -253,7 +254,7 @@ async def test_client_contract_with_real_core_router_and_authentication(monkeypa
     def request_session():
         with sessions() as db:
             yield db
-    core_app.dependency_overrides[get_db] = request_session
+    core_app.dependency_overrides[get_core_db] = request_session
     for bucket, limit in (("general", GENERAL_API_LIMIT), ("ai_generation", AI_GENERATION_LIMIT)):
         core_app.dependency_overrides[require_rate_limit(bucket=bucket, rate_limit=limit)] = lambda: None
     backend = AsyncMock(return_value={"model": "model-reported-by-core", "message": {"content": json.dumps(ANALYSIS)}})

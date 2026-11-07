@@ -11,7 +11,8 @@ from sqlalchemy.pool import StaticPool
 
 from app.api.v1.discovery import get_discovery_provider
 from app.api.v1.router import api_router
-from app.core.database import Base, get_db
+from app.core.database import get_db
+from app.database import Base
 from app.core.models import CoreBase, ApplicationDB, APIKeyDB, SourceRecordDB
 from app.factory import create_app
 from app.services.api_key_service import generate_api_key

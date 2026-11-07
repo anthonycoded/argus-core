@@ -1,0 +1,35 @@
+{
+  "research_sources": {
+    "table": "CREATE TABLE research_sources (\n\tid SERIAL NOT NULL, \n\ttopic_id INTEGER NOT NULL, \n\ttitle VARCHAR(1000) NOT NULL, \n\turl VARCHAR(2048) NOT NULL, \n\tpublisher VARCHAR(255), \n\tpublished_at TIMESTAMP WITH TIME ZONE, \n\tsnippet TEXT, \n\tsource_type VARCHAR(50) NOT NULL, \n\tdiscovered_at TIMESTAMP WITH TIME ZONE NOT NULL, \n\tPRIMARY KEY (id), \n\tCONSTRAINT uq_research_sources_topic_url UNIQUE (topic_id, url), \n\tFOREIGN KEY(topic_id) REFERENCES topics (id) ON DELETE CASCADE\n)",
+    "indexes": [
+      "CREATE INDEX ix_research_sources_id ON research_sources (id)",
+      "CREATE INDEX ix_research_sources_topic_id ON research_sources (topic_id)"
+    ]
+  },
+  "story_cluster_members": {
+    "table": "CREATE TABLE story_cluster_members (\n\tid SERIAL NOT NULL, \n\tcluster_id INTEGER NOT NULL, \n\ttopic_id INTEGER NOT NULL, \n\tPRIMARY KEY (id), \n\tFOREIGN KEY(cluster_id) REFERENCES story_clusters (id) ON DELETE CASCADE, \n\tFOREIGN KEY(topic_id) REFERENCES topics (id) ON DELETE CASCADE\n)",
+    "indexes": [
+      "CREATE INDEX ix_story_cluster_members_cluster_id ON story_cluster_members (cluster_id)",
+      "CREATE UNIQUE INDEX ix_story_cluster_members_topic_id ON story_cluster_members (topic_id)"
+    ]
+  },
+  "story_clusters": {
+    "table": "CREATE TABLE story_clusters (\n\tid SERIAL NOT NULL, \n\ttitle VARCHAR(500) NOT NULL, \n\tsummary TEXT NOT NULL, \n\tconfidence INTEGER NOT NULL, \n\tcreated_at TIMESTAMP WITH TIME ZONE NOT NULL, \n\tPRIMARY KEY (id)\n)",
+    "indexes": []
+  },
+  "topic_analyses": {
+    "table": "CREATE TABLE topic_analyses (\n\tid SERIAL NOT NULL, \n\ttopic_id INTEGER NOT NULL, \n\tsummary TEXT NOT NULL, \n\trelevance INTEGER NOT NULL, \n\tresearch_priority INTEGER NOT NULL, \n\trationale TEXT NOT NULL, \n\tresearch_questions TEXT NOT NULL, \n\tmodel VARCHAR(100) NOT NULL, \n\tanalyzed_at TIMESTAMP WITH TIME ZONE NOT NULL, \n\tPRIMARY KEY (id), \n\tFOREIGN KEY(topic_id) REFERENCES topics (id) ON DELETE CASCADE\n)",
+    "indexes": [
+      "CREATE UNIQUE INDEX ix_topic_analyses_topic_id ON topic_analyses (topic_id)"
+    ]
+  },
+  "topics": {
+    "table": "CREATE TABLE topics (\n\tid SERIAL NOT NULL, \n\ttitle VARCHAR(500) NOT NULL, \n\turl VARCHAR(2048) NOT NULL, \n\tsource VARCHAR(200) NOT NULL, \n\tpublished_at TIMESTAMP WITH TIME ZONE, \n\tfetched_at TIMESTAMP WITH TIME ZONE NOT NULL, \n\trelevance_score FLOAT NOT NULL, \n\tfreshness_score FLOAT NOT NULL, \n\tscore FLOAT NOT NULL, \n\tstatus VARCHAR(30) NOT NULL, \n\tsummary TEXT, \n\tPRIMARY KEY (id)\n)",
+    "indexes": [
+      "CREATE INDEX ix_topics_id ON topics (id)",
+      "CREATE INDEX ix_topics_score ON topics (score)",
+      "CREATE INDEX ix_topics_status ON topics (status)",
+      "CREATE UNIQUE INDEX ix_topics_url ON topics (url)"
+    ]
+  }
+}

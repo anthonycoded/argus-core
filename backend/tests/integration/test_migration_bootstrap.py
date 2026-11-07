@@ -20,7 +20,7 @@ from sqlalchemy import inspect, select, text
 from sqlalchemy.exc import IntegrityError
 
 from app import models as chess_models
-from app.core.database import Base
+from app.database import Base
 from app.core.models import CoreBase
 
 ROOT = Path(__file__).resolve().parents[3]
