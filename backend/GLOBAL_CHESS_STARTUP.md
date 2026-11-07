@@ -48,25 +48,24 @@ path continues using approved feed IDs, never those URLs for local fetching.
 Research/ingestion feed constants keep their tuple-of-pairs shapes. No compatibility
 facade exposes Core Redis/database or admission settings.
 
-## Unmigrated relevance classification
+## Relevance classification
 
-Relevance classification remains direct Ollama inference in this phase. The old
-shared provider client imports Core settings at module import, so Global Chess now
-uses a small temporary application-owned compatibility client in
-`clients/global_chess_ollama_client.py`. Its `/api/chat` payload, timeout, schema,
-temperature, response parsing, proxy behavior and exception flow match the previous
-client. Editorial prompts, classification logic and failure/None semantics remain
-unchanged. Topic analysis and research planning/evaluation/synthesis continue using
-authenticated Core HTTP as before. Core's generic Ollama client is untouched.
+Phase 6D.2 routes relevance classification through the application-owned
+authenticated Core HTTP client, alongside topic analysis and research inference.
+Its exact editorial prompts, response schema, temperature and 60-second model
+timeout are preserved. The active workflow no longer imports or instantiates
+`clients/global_chess_ollama_client.py`; that compatibility utility remains in the
+package for historical callers. It is never an automatic fallback. See
+GLOBAL_CHESS_CORE_INTEGRATION.md for workload bounds and approved coverage fields.
 
-`GLOBAL_CHESS_OLLAMA_BASE_URL` and `GLOBAL_CHESS_OLLAMA_MODEL` select the temporary
-classifier destination/model; generic `OLLAMA_BASE_URL` and `OLLAMA_MODEL` remain
+`GLOBAL_CHESS_OLLAMA_BASE_URL` and `GLOBAL_CHESS_OLLAMA_MODEL` configure only the
+inactive compatibility utility; generic `OLLAMA_BASE_URL` and `OLLAMA_MODEL` remain
 lower-priority aliases. Defaults remain `http://localhost:12400` and `qwen2.5:3b`.
 No provider destination is changed automatically. Provider URLs are secret-masked
 in settings, while existing `app.config.OLLAMA_BASE_URL` remains a string alias.
 Do not log that alias. Core API keys/database URLs remain secret-masked and server-
-side. Future relevance migration must resolve Core inference quota compatibility;
-this phase does not enable a Core fallback, retries or provider changes.
+side. Active classification uses `GLOBAL_CHESS_CORE_*` settings and `ai:generate`.
+Core AI quotas/admission are operator-controlled; Global Chess never raises them.
 
 ## Lifecycle and remaining limits
 

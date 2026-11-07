@@ -44,7 +44,7 @@ class GlobalChessSettings(BaseSettings):
     freshness_weight: float = Field(default=0.3, ge=0, le=1, allow_inf_nan=False)
     freshness_window_hours: float = Field(default=72.0, gt=0, allow_inf_nan=False)
     missing_date_freshness: float = Field(default=40.0, ge=0, le=100, allow_inf_nan=False)
-    # Temporary direct-classifier configuration, independent of Core settings.
+    # Inactive legacy-client configuration, independent of Core settings.
     ollama_base_url: SecretStr = Field(default=SecretStr("http://localhost:12400"), repr=False,
         validation_alias=AliasChoices("GLOBAL_CHESS_OLLAMA_BASE_URL", "OLLAMA_BASE_URL"))
     ollama_model: str = Field(default="qwen2.5:3b",
@@ -52,6 +52,21 @@ class GlobalChessSettings(BaseSettings):
     core_base_url: str | None = None
     core_api_key: SecretStr | None = Field(default=None, repr=False)
     core_request_timeout: float = Field(default=190.0, gt=0, le=600, allow_inf_nan=False)
+    classification_max_candidates: int = Field(default=150, ge=1, le=150)
+    classification_max_seconds: float = Field(default=600.0, gt=0, le=600, allow_inf_nan=False)
+
+    @field_validator("classification_max_candidates", "classification_max_seconds", mode="before")
+    @classmethod
+    def valid_classification_bound(cls, value, info):
+        if isinstance(value, bool):
+            raise ValueError("Classification bounds must be numeric")
+        if info.field_name == "classification_max_candidates":
+            if isinstance(value, str) and value.isascii() and value.isdigit():
+                value = int(value)
+            if type(value) is not int:
+                raise ValueError("Classification candidate bounds must be integers")
+        return value
+
     database_url: SecretStr | None = Field(default=None, repr=False)
     environment: str = "development"
     allow_legacy_database_url: bool = True

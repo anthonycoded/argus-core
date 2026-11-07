@@ -2,6 +2,7 @@ import logging
 
 from app.clients.argus_core_client import CoreClientError, CoreDiscoveryClient, CoreInferenceClient, get_core_inference_client
 from app.schemas import ResearchAgentResult
+from app.services.classification_coverage import ClassificationContext
 from app.services.synthesis_service import synthesize_research
 from app.services.research_planner import (
     generate_research_plan,
@@ -23,6 +24,7 @@ async def run_research_agent(
     *,
     inference_client: CoreInferenceClient | None = None,
     discovery_client: CoreDiscoveryClient | None = None,
+    classification_context: ClassificationContext | None = None,
 ) -> ResearchAgentResult:
 
     if not topic.strip():
@@ -35,6 +37,7 @@ async def run_research_agent(
 
     metrics = new_research_metrics()
     review_queue = []
+    classification_context = classification_context if classification_context is not None else ClassificationContext()
 
     all_sources = {}
     processed_urls = set()
@@ -101,6 +104,8 @@ async def run_research_agent(
                     review_queue=review_queue,
                     processed_urls=processed_urls,
                     discovery_client=discovery_client,
+                    inference_client=inference_client,
+                    classification_context=classification_context,
                 )
             except ResearchDiscoveryError as exc:
                 discovered = exc.partial_sources
@@ -212,7 +217,9 @@ async def run_research_agent(
     final_sources = list(all_sources.values())
 
 
-    if not final_sources:
+    if discovery_failed:
+        status = "incomplete"
+    elif not final_sources:
         status = "incomplete"
         limitations.append(
             "No sources passed the relevance classification."
@@ -302,6 +309,7 @@ async def run_research_agent(
         sources_discovered=len(final_sources),
         sources=final_sources,
         metrics=metrics,
+        classification_coverage=classification_context.snapshot(),
         review_queue=review_queue,
         decision_history=decision_history,
         findings=findings,

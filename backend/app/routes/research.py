@@ -1,11 +1,13 @@
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from fastapi.responses import JSONResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 import httpx
 
 from app.database import get_db
-from app.clients.argus_core_client import CoreClientError, CoreDiscoveryClient, get_core_discovery_client
+from app.clients.argus_core_client import CoreClientError, CoreDiscoveryClient, CoreInferenceClient, get_core_discovery_client, get_core_inference_client
+from app.services.classification_coverage import ClassificationContext
 from app.models import ResearchSource, Topic
 from app.services.research_service import (
     discover_sources,
@@ -26,6 +28,7 @@ async def research_topic(
     limit: int = Query(10, ge=1, le=25),
     db: Session = Depends(get_db),
     discovery_client: CoreDiscoveryClient = Depends(get_core_discovery_client),
+    inference_client: CoreInferenceClient = Depends(get_core_inference_client),
 ):
     topic = db.get(Topic, topic_id)
 
@@ -42,6 +45,7 @@ async def research_topic(
         )
 
     
+    classification_context = ClassificationContext()
     try:
         metrics = new_research_metrics()
 
@@ -53,9 +57,16 @@ async def research_topic(
             metrics=metrics,
             review_queue=review_queue,
             discovery_client=discovery_client,
+            inference_client=inference_client,
+            classification_context=classification_context,
         )
     except ResearchDiscoveryError as exc:
         if not exc.partial_sources and not review_queue:
+            if exc.classification_coverage is not None:
+                return JSONResponse(status_code=exc.status_code, content={
+                    "detail": exc.detail,
+                    "classification_coverage": exc.classification_coverage.model_dump(mode="json"),
+                }, headers={"Retry-After": exc.retry_after} if exc.retry_after is not None else None)
             raise HTTPException(
                 status_code=exc.status_code, detail=exc.detail,
                 headers={"Retry-After": exc.retry_after} if exc.retry_after is not None else None,
@@ -82,6 +93,7 @@ async def research_topic(
         ) from exc
 
 
+    classification_coverage = classification_context.snapshot().model_dump(mode="json")
     inserted = 0
     updated = 0
 
@@ -136,6 +148,7 @@ async def research_topic(
         **metrics,
         "total_saved": len(saved_sources),
         "review_queue": review_queue,
+        "classification_coverage": classification_coverage,
         "sources": [
             {
                 "id": source.id,

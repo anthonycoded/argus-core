@@ -14,7 +14,7 @@ def offline(monkeypatch):
     monkeypatch.setattr(httpcore.AsyncConnectionPool, "handle_async_request", AsyncMock(
         side_effect=AssertionError("Unexpected live inference")))
     direct = AsyncMock(side_effect=AssertionError("Research called Ollama directly"))
-    monkeypatch.setattr("app.services.ollama_service.ollama_client.generate_structured", direct)
+    monkeypatch.setattr("app.clients.global_chess_ollama_client.OllamaClient.generate_structured", direct)
     yield
     direct.assert_not_called()
 

@@ -1,7 +1,7 @@
 # Global Chess topic analysis through Argus-Core
 
-`POST /topics/{topic_id}/analyze` and the research agent's planning, evaluation,
-and synthesis inference now use authenticated Core HTTP:
+`POST /topics/{topic_id}/analyze`, relevance classification, and the research
+agent's planning, evaluation and synthesis inference use authenticated Core HTTP:
 
     Global Chess route -> editorial prompt and schema
         -> CoreInferenceClient -> authenticated HTTP POST /api/v1/ai/generate
@@ -11,8 +11,8 @@ and synthesis inference now use authenticated Core HTTP:
 The client and its settings belong to Global Chess and import no Core settings,
 database models or internal services. Existing packages, tables and editorial
 prompts remain in place. `analyze_topic_with_ollama` retains its legacy import name,
-but topic analysis never calls its module's direct Ollama client. Classification,
-GDELT discovery retains its existing path. RSS ingestion and RSS/Google News research
+but no active inference workflow instantiates a direct Ollama client.
+GDELT discovery retains its disabled orchestration path. RSS ingestion and RSS/Google News research
 discovery use Core HTTP as described below. Research inference uses
 `services/research_inference.py` for input-limit and Pydantic validation.
 
@@ -102,8 +102,8 @@ and other research configuration remain coupled until later separation milestone
 `generate_research_plan`, `evaluate_research_progress`, `synthesize_research`, and
 `run_research_agent` accept an optional keyword-only `inference_client`. Default
 calls use the same server-side settings and authenticated adapter as topic analysis.
-There is no direct-Ollama fallback. GDELT discovery and relevance
-classification retain their existing provider paths. RSS ingestion and RSS/Google News research use Core.
+There is no direct-Ollama fallback. GDELT discovery remains disabled in research.
+RSS ingestion, RSS/Google News research and relevance inference use Core.
 
 Planning keeps temperature 0.2 and a 120-second inference timeout; evaluation keeps
 temperature 0 and 120 seconds; synthesis keeps temperature 0 and 180 seconds.
@@ -215,7 +215,7 @@ Core's separate 10/minute discovery quota, general quota, secure-fetch/parser li
 and locale restrictions now apply. The existing 190-second default HTTP phase timeout
 is shared with inference; Core currently bounds discovery operations at 25 seconds.
 Callers/proxies still need suitable total job budgets. See DISCOVERY_API.md for Core
-limits. Relevance classification retains its existing provider behavior.
+limits. Relevance classification now uses Core inference as described below.
 
 ## RSS research discovery
 
@@ -292,3 +292,137 @@ The optional Global Chess source client supports authenticated registration and
 lookup with typed identity verification and explicit write uncertainty. No workflow
 registers sources automatically. See [GLOBAL_CHESS_SOURCE_IDENTITY.md](GLOBAL_CHESS_SOURCE_IDENTITY.md)
 for scopes, conflicts, privacy boundaries and immutable-evidence requirements.
+
+
+## Phase 6D.2: relevance classification and incomplete coverage
+
+Global Chess sends one sequential authenticated `/api/v1/ai/generate` request per
+eligible article. The server-side key needs `ai:generate` in addition to discovery
+permissions. The editorial system/user prompts, labels, rationale requirements,
+temperature 0.0 and 60-second model timeout are unchanged. A frozen fixture checks
+these exact contracts. No batching, automatic retry, provider fallback, source
+registration or GDELT enablement is introduced. Legacy Ollama settings/utility
+remain available for compatibility but are not imported by the active classifier.
+
+The full prompts are checked before inference against 10,000 system and 30,000
+user characters. Descriptions are never shortened. An oversized valid RSS
+observation is retained as `not_attempted / prompt_too_large`, consumes evaluation
+budget, and causes explicit incomplete coverage. Actual returned Core model names
+are retained in bounded, transient context diagnostics; no historical provenance is
+invented and model diagnostics are not included in public coverage records.
+
+Operator settings on Global Chess, validated before startup:
+
+| Setting | Default | Accepted values |
+| --- | --- | --- |
+| `GLOBAL_CHESS_CLASSIFICATION_MAX_CANDIDATES` | 150 | Integer 1-150 |
+| `GLOBAL_CHESS_CLASSIFICATION_MAX_SECONDS` | 600 | Finite number >0 and <=600 |
+
+One context spans a request or the entire agent job. Every evaluated candidate,
+including a local prompt rejection, consumes the candidate budget. Elapsed time
+accumulates only during classification, excluding discovery, planning/evaluation
+and synthesis. The remaining time bounds each await; the requested model timeout
+remains 60 seconds. Reaching the candidate limit uses 503; reaching the elapsed
+limit uses 504. Neither fabricates Retry-After. Synchronous work/cancellation
+cleanup still requires cooperative scheduling. These limits do not change provider
+candidate budgets, RSS-first order, editorial rules or agent iteration settings.
+
+Research success/partial bodies and `ResearchAgentResult` add the approved
+`classification_coverage` object:
+
+```json
+{
+  "complete": false,
+  "attempted": 1,
+  "classified": 0,
+  "failed": 1,
+  "not_attempted": 1,
+  "stop_reason": "rate_limited",
+  "retry_after": "30",
+  "unclassified": [
+    {"status": "failed", "reason": "rate_limited", "source": {
+      "title": "First article", "url": "https://example.com/first",
+      "publisher": "Example", "published_at": null, "snippet": "Full description.",
+      "source_type": "rss", "provenance": {}
+    }},
+    {"status": "not_attempted", "reason": "rate_limited", "source": {
+      "title": "Second article", "url": "https://example.com/second",
+      "publisher": "Example", "published_at": null, "snippet": "Full description.",
+      "source_type": "rss", "provenance": {}
+    }}
+  ]
+}
+```
+
+Counts cover eligible normalized-URL winners already discovered, excluding duplicate
+observations and previously successful classifications. They do not estimate
+unfetched feeds, articles or future queries. `attempted` counts inference invocations
+(including attempts that fail configuration/connection), not confirmed provider
+execution. `attempted = classified + failed`. Local prompt rejections and known
+remaining candidates are `not_attempted`. Existing `classification_failed` retains
+its aggregate classifier-failure meaning, including local rejections; it is not the
+new attempted-failure count. Discovery failure sets `complete: false` with
+`discovery_incomplete` rather than claiming complete classification coverage.
+
+Only the public source fields in the example and bounded provenance (provider,
+canonical/original URL, feed ID, snapshot ID and entry index) are projected. Dates
+are UTC. Arbitrary provider metadata, editorial/private fields, prompts, keys,
+internal exceptions and execution/model diagnostics are excluded. Typed records
+forbid additional fields and enforce fixed reason codes. There are at most 225
+retained observations: 150 evaluated candidates plus one fetched provider batch of
+at most 75. The **96 MiB serialized coverage ceiling is a structural validation
+bound, not a practical response-size budget**. Current coverage field/cardinality
+contracts permit at most 94,864,008 bytes (90.47 MiB), so they already constrain
+valid objects below that ceiling. The assertion protects against future contract
+drift; it is not an independent small-payload admission limit.
+
+Size validation counts compact JSON UTF-8 bytes incrementally, with the same
+escaping options as the API's standard JSONResponse. Projection and intermediate
+escaped tokens are bounded by validated fields/cardinality; the validator does
+not allocate a whole serialized coverage string and subsequent byte copy. Exact
+equality with the ceiling remains accepted. Full descriptions are unchanged.
+
+Normal response serialization is unchanged and still buffers the complete body;
+large responses can therefore still require substantial memory. The coverage
+assertion also does not bound other fields, such as all previously saved sources.
+Deploy suitable ingress concurrency and response budgets. A lower ceiling with
+full-observation delivery would require a separately approved contract. No custom
+streaming response, pagination, overflow behavior, cache or durable job store is
+added by this correction.
+
+401/403 stop with the existing sanitized 502 integration mapping; 429/503 stop with
+validated Retry-After; 502/provider/network failures and timeouts stop explicitly.
+A malformed Core envelope is systemic. Invalid per-article structured output is a
+candidate failure; later candidates can still contribute evidence. Local oversized
+prompts likewise allow later candidates. Any incomplete classification ultimately
+returns retained, ranked/diversified partial evidence and stops further agent
+inference; it is never converted into an irrelevant classification. Editorial
+partial matches remain in `review_queue`; failures never enter that queue.
+
+Existing `X-Research-Partial`, `X-Research-Discovery-Status` and Retry-After behavior
+is reused. With no accepted evidence or editorial reviews, classification-related
+errors preserve status/detail and add `classification_coverage` alongside `detail`.
+Discovery-only errors keep their existing error envelope. Unrelated 404/409 behavior
+is unchanged. Accepted-source writes, single commit/rollback, stored status/summary,
+and synthesis citation validation remain unchanged. No unclassified observation is
+persisted. Failed URLs do not enter the cross-round processed set; a later explicit
+operation can reconsider them. Within a query, the existing first winner still
+prevents a failed RSS URL being retried through a Google News duplicate.
+
+Native/AnyIO cancellation propagates and closes the pending HTTP operation. Completed
+relevant observations, editorial reviews and failed/unattempted accounting remain
+in the bounded context if its owner retains it. Cancelled routes do not commit
+partial results. A disconnected caller is not guaranteed a response or recovery;
+there is no durable delivery promise. Core's independent admission retains its own
+ownership until its operation finishes (see AI_CAPACITY.md). Core cannot prove
+remote GPU work stopped after transport failure.
+
+Core quotas remain operator-controlled: default AI 10/minute, optional verified
+application override up to 60/minute, general 120/minute and shared fail-fast
+inference capacity. These are allowances, not guaranteed throughput. Global Chess
+never increases quotas or sleeps/retries after quota/capacity failures.
+
+`tests/test_relevance_core.py` uses mocked HTTP/ASGI and in-memory SQLite for exact
+prompt/schema preservation, failure taxonomy, bounds, full observations, privacy,
+cancellation, shared agent budgets and persistence. Existing ingestion, research,
+analysis, source identity and Core suites remain separate regression coverage.

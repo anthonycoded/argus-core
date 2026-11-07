@@ -190,7 +190,7 @@ async def test_research_route_persists_only_existing_fields_and_updates_as_befor
         first = await http.post("/topics/1/research")
         assert first.status_code == 200 and first.json()["inserted"] == 1
         assert set(first.json()) == {"topic_id", "topic_title", "discovered", "inserted", "updated", "total_saved", "sources",
-                                     "review_queue", *research_service.new_research_metrics()}
+                                     "review_queue", "classification_coverage", *research_service.new_research_metrics()}
         assert set(first.json()["sources"][0]) == {"id", "title", "url", "publisher", "published_at", "source_type"}
         payload["candidates"][0]["title"] = "Updated title"
         payload["candidates"][0]["snippet"] = "Updated snippet"

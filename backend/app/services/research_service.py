@@ -14,6 +14,8 @@ from app.clients.argus_core_client import CoreClientError, CoreDiscoveryClient, 
 from app.global_chess_config import RESEARCH_RSS_FEEDS
 from app.services.rss_service import normalize_url
 from app.services.ollama_service import classify_article_relevance
+from app.services.classification_coverage import ClassificationContext, ClassificationFailure
+from app.clients.classification_contracts import CoverageSource
 
 logger = logging.getLogger(__name__)
 
@@ -217,9 +219,10 @@ async def discover_rss_sources(
 class ResearchDiscoveryError(CoreClientError):
     """Explicit discovery failure carrying already accepted evidence."""
 
-    def __init__(self, error: CoreClientError, partial_sources: list[dict]):
+    def __init__(self, error: CoreClientError, partial_sources: list[dict], *, classification_coverage=None):
         super().__init__(error.status_code, error.detail, error.retry_after)
         self.partial_sources = partial_sources
+        self.classification_coverage = classification_coverage
 
 
 async def discover_google_news_sources(
@@ -328,6 +331,8 @@ async def discover_sources(
     processed_urls: set[str] | None = None,
     *,
     discovery_client: CoreDiscoveryClient | None = None,
+    inference_client=None,
+    classification_context: ClassificationContext | None = None,
 ) -> list[dict]:
     
     """Discover, classify, and rank sources for a research topic."""
@@ -336,16 +341,25 @@ async def discover_sources(
         metrics = new_research_metrics()
 
     if review_queue is None:
-        review_queue = []
+        review_queue = classification_context.review_queue if classification_context is not None else []
    
 
     candidate_limit = min(limit * 3, 75)
+    context = classification_context if classification_context is not None else ClassificationContext()
+    context.review_queue = review_queue
+    if context.limit() or context.stop_reason:
+        if not context.stop_reason:
+            context.stop(context.limit())
+        raise ResearchDiscoveryError(context.error, [], classification_coverage=context.snapshot())
 
     provider_error = None
     try:
         rss_candidates = await discover_rss_sources(
             query, candidate_limit, discovery_client=discovery_client,
         )
+    except asyncio.CancelledError:
+        context.stop("cancelled", CoreClientError(503, "Research classification was cancelled."))
+        raise
     except ResearchDiscoveryError as exc:
         provider_error = exc
         rss_candidates = exc.partial_sources
@@ -369,27 +383,76 @@ async def discover_sources(
     # Previously reviewed partial matches should not be
     # classified again in subsequent research rounds.
     seen_urls.update(reviewed_urls)
+    observed_urls = set()  # Failed URLs retain their winner within this query only.
 
     async def classify_candidates(candidates: list[dict]) -> None:
+        if len(candidates) > 75:
+            raise CoreClientError(502, "Discovery returned an invalid candidate batch.")
+        eligible = []
         for item in candidates:
             url = normalize_url(item["url"])
-
-            if not url or url in seen_urls:
+            if not url or url in seen_urls or url in observed_urls:
                 continue
+            observed_urls.add(url)
+            observation = {**item, "url": url}
+            eligible.append((observation, CoverageSource.from_candidate(observation)))
 
-            seen_urls.add(url)
+        def retain_remaining(offset, reason):
+            for _, source in eligible[offset:]:
+                context.record(source, reason=reason)
 
-            
-            result = await classify_article_relevance(
-                topic=query,
-                title=item["title"],
-                snippet=item.get("snippet"),
-            )
+        for index, (item, source) in enumerate(eligible):
+            reason = context.stop_reason or context.limit()
+            if reason:
+                if not context.stop_reason:
+                    context.stop(reason)
+                retain_remaining(index, reason)
+                break
 
-            if result is None:
+            context.evaluated += 1
+            started = context.clock()
+            diagnostics = {}
+            failure = None
+            try:
+                async with asyncio.timeout(context.max_seconds - context.elapsed):
+                    result = await classify_article_relevance(
+                        topic=query, title=item["title"], snippet=item.get("snippet"),
+                        inference_client=inference_client, diagnostics=diagnostics,
+                    )
+                if result is None:
+                    raise ClassificationFailure(CoreClientError(502, "Argus-Core returned an invalid relevance classification."),
+                                                reason="invalid_output", attempted=True, systemic=False)
+            except asyncio.CancelledError as cancelled:
+                try:
+                    context.stop("cancelled", CoreClientError(503, "Research classification was cancelled."))
+                    context.record(source, reason="cancelled", attempted=True)
+                    retain_remaining(index + 1, "cancelled")
+                finally:
+                    raise cancelled  # Preserve cancellation even if accounting fails.
+            except TimeoutError:
+                failure = ClassificationFailure(CoreClientError(504, "Research classification time limit reached."),
+                                                reason="workload_deadline", attempted=True, systemic=True)
+            except ClassificationFailure as exc:
+                failure = exc
+            finally:
+                context.elapsed += max(0.0, context.clock() - started)
+                if "model" in diagnostics:
+                    context.models.append(diagnostics["model"])
+            if failure is not None:
+                context.record(source, reason=failure.reason, attempted=failure.attempted)
                 metrics["classification_failed"] += 1
-                logger.warning("Excluding unclassified article: %s",item["title"])
+                context.error = context.error or failure
+                if failure.systemic:
+                    context.stop(failure.reason, failure)
+                    retain_remaining(index + 1, failure.reason)
+                    break
                 continue
+
+            context.attempted += 1
+            context.classified += 1
+            url = item["url"]
+            # Only successful classifications suppress later explicit rounds.
+            seen_urls.add(item["url"])
 
             if result.classification == "relevant":
                 metrics["classified_relevant"] += 1
@@ -429,17 +492,23 @@ async def discover_sources(
                 logger.debug("Rejected irrelevant article: %s", item["title"])
                 continue
                 
-            item["url"] = url
             accepted.append(item)
+            context.completed_sources.append(item)
 
     await classify_candidates(rss_candidates)
 
+    if not context.stop_reason and context.limit():
+        context.stop(context.limit())
+
     try:
-        google_news_candidates = await discover_google_news_sources(
+        google_news_candidates = [] if context.stop_reason else await discover_google_news_sources(
             query=query,
             limit=candidate_limit,
             discovery_client=discovery_client,
         )
+    except asyncio.CancelledError:
+        context.stop("cancelled", CoreClientError(503, "Research classification was cancelled."))
+        raise
     except CoreClientError as exc:
         # Preserve RSS selection, but never disguise a failed request as empty.
         if provider_error is None:
@@ -566,6 +635,14 @@ async def discover_sources(
     for item in selected:
         item.pop("_relevance", None)
 
-    if provider_error is not None:
-        raise ResearchDiscoveryError(provider_error, selected) from None
+    classification_incomplete = bool(context.unclassified or context.stop_reason)
+    if provider_error is not None and not context.stop_reason:
+        context.stop("discovery_incomplete", provider_error)
+    coverage = context.snapshot()
+    if provider_error is not None or not coverage.complete:
+        error = context.error if context.stop_reason not in {None, "discovery_incomplete"} else provider_error or context.error
+        raise ResearchDiscoveryError(
+            error, selected,
+            classification_coverage=coverage if classification_incomplete else None,
+        ) from None
     return selected

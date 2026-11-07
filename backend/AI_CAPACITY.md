@@ -2,8 +2,9 @@
 
 `POST /api/v1/ai/generate` retains its request fields, success envelope,
 `ai:generate` scope, model selection and provider-error mappings. Global Chess
-relevance classification is unchanged in this phase and still uses its temporary
-direct Ollama client. No endpoint, database schema, or migration is added.
+relevance classification now uses this endpoint in Phase 6D.2; see
+GLOBAL_CHESS_CORE_INTEGRATION.md for its bounded workload and coverage contract.
+No endpoint, database schema, or migration is added.
 
 ## Operator configuration
 
@@ -102,7 +103,7 @@ research workload before raising it; increasing requests/minute cannot create GP
 capacity. A 150-candidate job can exceed a minute even at a 60/minute AI allowance.
 Discovery, pagination and other calls also consume the unchanged general quota.
 Callers must surface incomplete work and validated retry guidance without blind
-retries; relevance migration and its partial-result handling are Phase 6D.2.
+retries; relevance migration and its partial-result handling are documented in Phase 6D.2.
 
 Restart Core with validated operator configuration; no migration or automatic data
 change is required. Preserve existing audit configuration. Successful requests,

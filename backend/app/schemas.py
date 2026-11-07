@@ -1,5 +1,6 @@
 from typing import Literal
 from pydantic import BaseModel, Field
+from app.clients.classification_contracts import ClassificationCoverage
 
 
 class TopicStatusUpdate(BaseModel):
@@ -124,6 +125,7 @@ class ResearchAgentResult(BaseModel):
     sources: list[dict] = Field(default_factory=list)
 
     metrics: dict = Field(default_factory=dict)
+    classification_coverage: ClassificationCoverage = Field(default_factory=ClassificationCoverage)
     review_queue: list[dict] = Field(default_factory=list)
     decision_history: list[dict] = Field(default_factory=list)
 

@@ -7,15 +7,13 @@ from fastapi import HTTPException
 from pydantic import BaseModel, Field
 
 from typing import Literal
-from app.clients.global_chess_ollama_client import OllamaClient
 from app.clients.argus_core_client import CoreClientError, CoreInferenceClient, get_core_inference_client
+from app.services.classification_coverage import ClassificationFailure
+from app.services.research_inference import SYSTEM_PROMPT_LIMIT, USER_PROMPT_LIMIT
 from app.schemas import StoryAnalysisResult
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-ollama_client = OllamaClient()
-
 
 class RelevanceClassification(BaseModel):
     classification: Literal[
@@ -37,7 +35,9 @@ async def classify_article_relevance(
     topic: str,
     title: str,
     snippet: str | None = None,
-) -> RelevanceClassification | None:
+    inference_client: CoreInferenceClient | None = None,
+    diagnostics: dict | None = None,
+) -> RelevanceClassification:
 
     system_prompt = """
 You are a geopolitical research relevance classifier for Global Chess.
@@ -178,9 +178,12 @@ Article description:
 Classify the article according to the system instructions.
 """
 
+    for prompt, limit in ((system_prompt, SYSTEM_PROMPT_LIMIT), (user_prompt, USER_PROMPT_LIMIT)):
+        if not 1 <= len(prompt) <= limit:
+            raise ClassificationFailure(CoreClientError(422, "Relevance prompt exceeds Argus-Core input limits; no inference was requested."),
+                                        reason="prompt_too_large", attempted=False, systemic=False)
     try:
-       
-        payload = await ollama_client.generate_structured(
+        generated = await (inference_client or get_core_inference_client()).generate_structured(
             system_prompt=system_prompt,
             user_prompt=user_prompt,
             response_schema=RelevanceClassification.model_json_schema(),
@@ -188,16 +191,21 @@ Classify the article according to the system instructions.
             temperature=0.0,
         )
 
-        content = payload["message"]["content"]
-
-        return RelevanceClassification.model_validate_json(content)
-
-    except (httpx.HTTPError, ValueError, KeyError, TypeError) as exc:
-        logger.warning(
-            "Article relevance classification failed: %s",
-            exc,
-        )
-        return None
+        if diagnostics is not None:
+            diagnostics["model"] = generated.model
+        return RelevanceClassification.model_validate_json(generated.content)
+    except CoreClientError as exc:
+        reason = exc.reason or {429: "rate_limited", 503: "service_unavailable", 504: "timeout"}.get(exc.status_code, "provider_error")
+        raise ClassificationFailure(exc, reason=reason, attempted=True, systemic=True) from None
+    except httpx.TimeoutException:
+        raise ClassificationFailure(CoreClientError(504, "AI inference request timed out."),
+                                    reason="timeout", attempted=True, systemic=True) from None
+    except httpx.HTTPError:
+        raise ClassificationFailure(CoreClientError(502, "Argus-Core inference request failed."),
+                                    reason="request_failed", attempted=True, systemic=True) from None
+    except (ValueError, KeyError, TypeError):
+        raise ClassificationFailure(CoreClientError(502, "Argus-Core returned an invalid relevance classification."),
+                                    reason="invalid_output", attempted=True, systemic=False) from None
 
 @dataclass(frozen=True)
 class AnalyzedTopic:

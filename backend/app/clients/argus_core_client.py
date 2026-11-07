@@ -32,11 +32,12 @@ class InferenceResult:
 class CoreClientError(Exception):
     """Only sanitized, application-facing details belong in this exception."""
 
-    def __init__(self, status_code: int, detail: str, retry_after: str | None = None):
+    def __init__(self, status_code: int, detail: str, retry_after: str | None = None, *, reason: str | None = None):
         super().__init__(detail)
         self.status_code = status_code
         self.detail = detail
         self.retry_after = retry_after
+        self.reason = reason  # Internal typed-adapter discrimination; never echo exceptions.
 
 
 class CoreInferenceClient(Protocol):
@@ -279,10 +280,10 @@ class ArgusCoreClient:
                     timeout=self._request_timeout, follow_redirects=False,
                 )
         except httpx.TimeoutException:
-            raise CoreClientError(504, f"{operation} request timed out.") from None
+            raise CoreClientError(504, f"{operation} request timed out.", reason="timeout") from None
         except httpx.HTTPError:
             detail = "Argus-Core inference request failed." if operation == "AI inference" else "Argus-Core discovery request failed."
-            raise CoreClientError(502, detail) from None
+            raise CoreClientError(502, detail, reason="request_failed") from None
 
     async def discover_google_news(self, *, query: str, limit: int = 10) -> CoreDiscoveryResult:
         try:
@@ -392,9 +393,12 @@ class ArgusCoreClient:
         }
         if response.status_code in failures:
             status, detail = failures[response.status_code]
-            raise CoreClientError(status, detail, retry_after if status in {429, 503} else None)
+            reasons = {401: "authentication_failed", 403: "permission_denied", 429: "rate_limited",
+                       503: "service_unavailable", 504: "timeout"}
+            raise CoreClientError(status, detail, retry_after if status in {429, 503} else None,
+                                  reason=reasons[response.status_code])
         if response.status_code != 200:
-            raise CoreClientError(502, "Argus-Core rejected the inference request.")
+            raise CoreClientError(502, "Argus-Core rejected the inference request.", reason="provider_error")
         try:
             data = response.json()
             if not isinstance(data, dict) or data.get("status") != "success":
@@ -408,7 +412,7 @@ class ArgusCoreClient:
                 raise ValueError
             return InferenceResult(content=content, model=model)
         except (ValueError, KeyError, TypeError):
-            raise CoreClientError(502, "Argus-Core returned an invalid inference response.") from None
+            raise CoreClientError(502, "Argus-Core returned an invalid inference response.", reason="invalid_response") from None
 
 
 def get_core_inference_client() -> CoreInferenceClient:
