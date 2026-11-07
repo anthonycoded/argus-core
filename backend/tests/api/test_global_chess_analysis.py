@@ -12,7 +12,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.clients.argus_core_client import ArgusCoreClient, InferenceResult, get_core_inference_client
 from app.database import Base, get_db
-from app.factory import create_app
+from app.global_chess_factory import create_app
 from app.models import Topic, TopicAnalysis
 from app.routes.analysis import router
 from app.schemas import StoryAnalysisResult
@@ -234,6 +234,7 @@ async def test_client_contract_with_real_core_router_and_authentication(monkeypa
     from app.api.v1 import ai
     from app.core.models import CoreBase, ApplicationDB, APIKeyDB
     from app.core.database import get_db as get_core_db
+    from app.factory import create_app as create_core_app
     from app.core.rate_limit import require_rate_limit
     from app.services.api_key_service import generate_api_key
     from app.services.rate_limiter import GENERAL_API_LIMIT, AI_GENERATION_LIMIT
@@ -250,7 +251,7 @@ async def test_client_contract_with_real_core_router_and_authentication(monkeypa
                         key_prefix=generated.key_prefix, key_hash=generated.key_hash,
                         scopes=[] if mode == "missing_scope" else ["ai:generate"]))
         db.commit()
-    core_app = create_app(routers=(api_router,))
+    core_app = create_core_app(routers=(api_router,))
     def request_session():
         with sessions() as db:
             yield db

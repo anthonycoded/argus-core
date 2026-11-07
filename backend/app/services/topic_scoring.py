@@ -2,6 +2,7 @@
 from datetime import datetime, timezone
 
 from app.config import KEYWORDS
+from app.global_chess_config import global_chess_settings
 
 
 def score_topic(
@@ -19,7 +20,7 @@ def score_topic(
     relevance = min(float(raw_relevance), 100.0)
 
     if published_at is None:
-        freshness = 40.0
+        freshness = global_chess_settings.missing_date_freshness
     else:
         age_hours = max(
             0.0,
@@ -29,9 +30,10 @@ def score_topic(
         )
         freshness = max(
             0.0,
-            100.0 - (age_hours / 72.0 * 100.0),
+            100.0 - (age_hours / global_chess_settings.freshness_window_hours * 100.0),
         )
 
-    score = round(relevance * 0.7 + freshness * 0.3, 2)
+    score = round(relevance * global_chess_settings.relevance_weight
+                  + freshness * global_chess_settings.freshness_weight, 2)
 
     return round(relevance, 2), round(freshness, 2), score

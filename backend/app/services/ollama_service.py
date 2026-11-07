@@ -7,7 +7,7 @@ from fastapi import HTTPException
 from pydantic import BaseModel, Field
 
 from typing import Literal
-from app.clients.ollama_client import OllamaClient
+from app.clients.global_chess_ollama_client import OllamaClient
 from app.clients.argus_core_client import CoreClientError, CoreInferenceClient, get_core_inference_client
 from app.schemas import StoryAnalysisResult
 

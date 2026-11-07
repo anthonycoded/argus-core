@@ -78,10 +78,11 @@ PostgreSQL tests use separate uniquely named disposable databases and demonstrat
 that Core readiness creates no Global Chess tables. Existing API/persistence,
 ingestion, analysis, research, Core migration and readiness tests remain regressions.
 
-Remaining Core dependencies are intentionally outside Phase 6B: the shared factory
-and editorial compatibility config still import Core settings; relevance
-classification still uses the generic direct Ollama client; normalization remains
-shared. Independent migrations/readiness, packaging, access protection and the
+Phase 6C removes the shared factory/settings dependency and supplies an application-
+owned temporary direct classifier client; see
+[GLOBAL_CHESS_STARTUP.md](GLOBAL_CHESS_STARTUP.md). Relevance classification still
+uses direct Ollama inference and normalization remains shared.
+Independent migrations/readiness, packaging, access protection and the
 database data cutover require later milestones. Source registration remains unused
 by research/ingestion and GDELT remains disabled. No credentials, environment files,
 production/development databases or existing historical records are changed here.

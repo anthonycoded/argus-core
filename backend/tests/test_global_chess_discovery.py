@@ -124,7 +124,7 @@ def database():
 def application(sessions, discovery_client):
     from app.database import get_db
     from app.routes.research import router
-    from app.factory import create_app
+    from app.global_chess_factory import create_app
     app = create_app(routers=(router,))
     def session():
         with sessions() as db: yield db

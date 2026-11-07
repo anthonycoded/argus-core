@@ -1,4 +1,4 @@
-from app.factory import create_app
+from app.global_chess_factory import create_app
 
 # Register Global Chess database models.
 from app import models  # noqa: F401
@@ -18,7 +18,6 @@ async def close_global_chess_resources() -> None:
 
 
 app = create_app(
-    title="CivicStudio AI - Trend Scout",
     routers=(
         health.router,
         ingestion.router,
