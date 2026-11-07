@@ -1,10 +1,13 @@
 import base64
+import asyncio
 import hashlib
 import hmac
 import json
 import secrets
+import sys
 import time
 from datetime import datetime, timezone
+from threading import Lock
 
 import anyio
 
@@ -19,6 +22,83 @@ from app.services.discovery.rss_store import MAX_SNAPSHOT_BYTES, SNAPSHOT_TTL, S
 
 _capacity = anyio.CapacityLimiter(2)
 OPERATION_DEADLINE = 25.0
+
+
+async def _parse_owned(data, feed):
+    """Native cancellation cannot abandon an admitted parser's ownership."""
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:  # Non-asyncio AnyIO backends have no native Task.cancel().
+        return await anyio.to_thread.run_sync(parse_rss, data, feed)
+    finished = loop.create_future()
+    gate = Lock()
+    started = False
+    cancelled = False
+
+    def complete():
+        if not finished.done():
+            finished.set_result(None)
+
+    def parse():
+        nonlocal started
+        with gate:
+            if cancelled:
+                return None  # Cancellation won admission; never start later.
+            started = True
+        try:
+            return parse_rss(data, feed)
+        finally:
+            loop.call_soon_threadsafe(complete)
+
+    try:
+        return await anyio.to_thread.run_sync(parse)
+    except asyncio.CancelledError:
+        with gate:
+            cancelled = True
+            running = started
+        if running:
+            # AnyIO shielding handles scope cancellation; the loop also handles
+            # repeated native Task.cancel(), including graceful loop shutdown.
+            with anyio.CancelScope(shield=True):
+                while not finished.done():
+                    try:
+                        await asyncio.shield(finished)
+                    except asyncio.CancelledError:
+                        continue
+        raise  # Preserve the first cancellation, even if the parser later fails.
+
+
+async def _release_owned(store, feed_id, token):
+    """One bounded release attempt, joined before the RSS slot can be freed."""
+    async def release():
+        with anyio.move_on_after(2, shield=True):
+            try:
+                await store.release(feed_id, token)
+            except RSSFault:
+                pass  # Token TTL remains the fallback for storage failures.
+
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        await release()
+        return
+    # At most two such tasks exist: their owners still hold the two RSS slots.
+    job = asyncio.create_task(release())
+    cancelled = None
+    with anyio.CancelScope(shield=True):
+        while not job.done():
+            try:
+                await asyncio.shield(job)
+            except asyncio.CancelledError as exc:
+                if cancelled is None:
+                    cancelled = exc
+    try:
+        job.result()
+    except asyncio.CancelledError as exc:
+        if cancelled is None:
+            cancelled = exc
+    if cancelled is not None:
+        raise cancelled
 
 
 def cursor_for(snapshot: StoredSnapshot, app_id: str, offset: int, limit: int) -> str:
@@ -87,7 +167,18 @@ class RSSProvider:
                             if cooldown:
                                 raise RSSFault("throttled", str(cooldown))
                             token = secrets.token_hex(16)
-                            if not await self.store.acquire(feed.feed_id, token):
+                            try:
+                                acquired = await self.store.acquire(feed.feed_id, token)
+                            except asyncio.CancelledError:
+                                # SET may have succeeded before its reply was lost.
+                                # Token-checked cleanup cannot release another owner.
+                                original = sys.exception()
+                                try:
+                                    await _release_owned(self.store, feed.feed_id, token)
+                                except BaseException:
+                                    raise original
+                                raise
+                            if not acquired:
                                 raise RSSFault("busy", "1")
                             try:
                                 snapshot = await self.store.load(feed.feed_id)
@@ -96,7 +187,7 @@ class RSSProvider:
                                 if snapshot is None:
                                     fetched = await self.fetcher.fetch(feed)
                                     fetched_at = datetime.fromtimestamp(self.clock(), timezone.utc)
-                                    title, format_name, observations, duplicates = await anyio.to_thread.run_sync(parse_rss, fetched.data, feed)
+                                    title, format_name, observations, duplicates = await _parse_owned(fetched.data, feed)
                                     await anyio.lowlevel.checkpoint()
                                     snapshot = StoredSnapshot(snapshot_id=secrets.token_hex(16), feed_id=feed.feed_id,
                                         feed_label=feed.label, feed_url=feed.url, feed_revision=feed.revision,
@@ -105,17 +196,19 @@ class RSSProvider:
                                         feed_title=title, format=format_name, observations=observations, duplicate_observations=duplicates)
                                     if len(snapshot.model_dump_json().encode("utf-8")) > MAX_SNAPSHOT_BYTES:
                                         raise RSSFault("parser_limit")
+                                    await anyio.lowlevel.checkpoint()
                                     await self.store.publish(snapshot, token)
                             except DiscoveryError as exc:
                                 await self.store.defer(feed.feed_id, int(exc.retry_after or ("60" if exc.status == "throttled" else "5")))
                                 raise
                             finally:
-                                # Release only our own lease; never mask a fetch/parse error.
-                                with anyio.move_on_after(2, shield=True):
-                                    try:
-                                        await self.store.release(feed.feed_id, token)
-                                    except RSSFault:
-                                        pass
+                                original = sys.exception()
+                                try:
+                                    await _release_owned(self.store, feed.feed_id, token)
+                                except BaseException:
+                                    if isinstance(original, asyncio.CancelledError):
+                                        raise original
+                                    raise
                     page = snapshot.observations[offset:offset + request.limit]
                     next_offset = offset + len(page)
                     invalid = sum(isinstance(row, RSSRejectedEntry) for row in snapshot.observations)

@@ -147,6 +147,22 @@ Worker clocks should be synchronized. No PostgreSQL source/topic records are use
   with bounded cancellation-shielded response/lease cleanup. Each Redis command
   has a two-second deadline. Native parsing steps cannot be forcibly preempted;
   byte/chunk/structure bounds constrain them.
+- Parser admission is synchronized with native `asyncio.Task.cancel()`. Cancellation
+  before admission prevents a queued/dispatched job from subsequently parsing. Once
+  parsing starts, the request retains its RSS capacity slot and feed lease until
+  the parser returns or raises, including repeated cancellation and graceful event-
+  loop shutdown. Completion is observed independently of the cancellable AnyIO
+  worker result. Pending cancellation is checked again before snapshot publication;
+  cancelled parsing never publishes a snapshot. Original cancellation propagates.
+  Lease release is attempted once, with a two-second bound, and joined by its
+  capacity-owning request. Cancellation while awaiting a lease-acquisition reply
+  also attempts token-checked release, since Redis may already have accepted it.
+  These waits can extend response/shutdown time beyond the operation deadline.
+  The existing 30-second Redis lease is not renewed: expiry, storage failure, hard
+  process termination, or forced event-loop closure still require TTL recovery.
+  Graceful shutdown must allow worker draining; threads cannot be forcibly killed.
+  Cancellation racing an already-submitted Redis publication cannot undo a command
+  the server has accepted; publication itself remains token-checked and atomic.
 - Every request retains `discovery:read`, authentication, audit logging and the
   general 120/minute quota. Google News and RSS requests without a cursor share
   the unchanged `discovery` 10/minute application/key quota, even for cached first
