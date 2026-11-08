@@ -36,8 +36,8 @@ class CoreOnlyImports(importlib.abc.MetaPathFinder):
 
 
 def pytest_configure(config):
-    if config.inipath and config.inipath.name == "pytest-core.ini":
-        sys.meta_path.insert(0, CoreOnlyImports())
+    # The default suite is Core-only after retiring legacy application tests.
+    sys.meta_path.insert(0, CoreOnlyImports())
 
 
 @pytest.fixture

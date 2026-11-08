@@ -1,0 +1,2208 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Argus-Core",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/api/v1/health": {
+      "get": {
+        "tags": [
+          "Health"
+        ],
+        "summary": "Health",
+        "operationId": "health_api_v1_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/articles/extract": {
+      "post": {
+        "tags": [
+          "Articles"
+        ],
+        "summary": "Extract Article Endpoint",
+        "operationId": "extract_article_endpoint_api_v1_articles_extract_post",
+        "parameters": [
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ArticleExtractionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/ai/generate": {
+      "post": {
+        "tags": [
+          "AI Inference"
+        ],
+        "summary": "Generate Ai Response",
+        "operationId": "generate_ai_response_api_v1_ai_generate_post",
+        "parameters": [
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AIRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sources/normalize": {
+      "post": {
+        "tags": [
+          "Sources"
+        ],
+        "summary": "Normalize Source",
+        "operationId": "normalize_source_api_v1_sources_normalize_post",
+        "parameters": [
+          {
+            "name": "content",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Content"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SourceRecord"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceRecord"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sources/register": {
+      "post": {
+        "tags": [
+          "Sources"
+        ],
+        "summary": "Register Source Endpoint",
+        "operationId": "register_source_endpoint_api_v1_sources_register_post",
+        "parameters": [
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SourceRegistrationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sources/register/batch": {
+      "post": {
+        "tags": [
+          "Sources"
+        ],
+        "summary": "Register Source Batch Endpoint",
+        "operationId": "register_source_batch_endpoint_api_v1_sources_register_batch_post",
+        "parameters": [
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SourceBatchRegistrationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceBatchRegistrationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sources/{source_id}": {
+      "get": {
+        "tags": [
+          "Sources"
+        ],
+        "summary": "Get Registered Source",
+        "operationId": "get_registered_source_api_v1_sources__source_id__get",
+        "parameters": [
+          {
+            "name": "source_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Source Id"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceRegistryResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sources": {
+      "get": {
+        "tags": [
+          "Sources"
+        ],
+        "summary": "List Registered Sources",
+        "operationId": "list_registered_sources_api_v1_sources_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "publisher",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Publisher"
+            }
+          },
+          {
+            "name": "source_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Source Type"
+            }
+          },
+          {
+            "name": "domain",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Domain"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Search"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/discovery": {
+      "post": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "Discover",
+        "operationId": "discover_api_v1_discovery_post",
+        "parameters": [
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/DiscoveryRequest"
+                  },
+                  {
+                    "$ref": "#/components/schemas/RSSDiscoveryRequest"
+                  },
+                  {
+                    "$ref": "#/components/schemas/GDELTRequest"
+                  }
+                ],
+                "title": "Request"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/DiscoveryProviderResult"
+                    },
+                    {
+                      "$ref": "#/components/schemas/RSSDiscoveryResult"
+                    },
+                    {
+                      "$ref": "#/components/schemas/GDELTResult"
+                    }
+                  ],
+                  "title": "Response Discover Api V1 Discovery Post"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Application/key quota or provider throttling"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscoveryProviderResult"
+                }
+              }
+            },
+            "description": "Bad Gateway"
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscoveryProviderResult"
+                }
+              }
+            },
+            "description": "Gateway Timeout"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AIRequest": {
+        "properties": {
+          "system_prompt": {
+            "type": "string",
+            "maxLength": 10000,
+            "minLength": 1,
+            "title": "System Prompt"
+          },
+          "user_prompt": {
+            "type": "string",
+            "maxLength": 30000,
+            "minLength": 1,
+            "title": "User Prompt"
+          },
+          "response_schema": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Response Schema"
+          },
+          "temperature": {
+            "type": "number",
+            "maximum": 2.0,
+            "minimum": 0.0,
+            "title": "Temperature",
+            "default": 0.0
+          },
+          "timeout": {
+            "type": "number",
+            "maximum": 180.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Timeout",
+            "default": 60.0
+          }
+        },
+        "type": "object",
+        "required": [
+          "system_prompt",
+          "user_prompt",
+          "response_schema"
+        ],
+        "title": "AIRequest"
+      },
+      "ArticleExtractionRequest": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "maxLength": 2083,
+            "minLength": 1,
+            "format": "uri",
+            "title": "Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "url"
+        ],
+        "title": "ArticleExtractionRequest"
+      },
+      "CandidateProvenance": {
+        "properties": {
+          "provider_item_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2048
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider Item Id"
+          },
+          "original_url": {
+            "type": "string",
+            "maxLength": 2048,
+            "title": "Original Url"
+          },
+          "published_raw": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 256
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Published Raw"
+          },
+          "publisher_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2048
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Publisher Url"
+          },
+          "locale": {
+            "type": "string",
+            "const": "US:en",
+            "title": "Locale",
+            "default": "US:en"
+          },
+          "truncated_fields": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "title",
+                "publisher",
+                "snippet"
+              ]
+            },
+            "type": "array",
+            "maxItems": 3,
+            "title": "Truncated Fields"
+          }
+        },
+        "type": "object",
+        "required": [
+          "original_url"
+        ],
+        "title": "CandidateProvenance"
+      },
+      "DiscoveryCandidate": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Title"
+          },
+          "url": {
+            "type": "string",
+            "maxLength": 2048,
+            "title": "Url"
+          },
+          "canonical_url": {
+            "type": "string",
+            "maxLength": 2048,
+            "title": "Canonical Url"
+          },
+          "domain": {
+            "type": "string",
+            "maxLength": 253,
+            "title": "Domain"
+          },
+          "publisher": {
+            "type": "string",
+            "maxLength": 255,
+            "title": "Publisher"
+          },
+          "published_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Published At"
+          },
+          "snippet": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 16384
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snippet"
+          },
+          "provider": {
+            "type": "string",
+            "const": "google_news",
+            "title": "Provider",
+            "default": "google_news"
+          },
+          "source_type": {
+            "type": "string",
+            "const": "google_news",
+            "title": "Source Type",
+            "default": "google_news"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/CandidateProvenance"
+          }
+        },
+        "type": "object",
+        "required": [
+          "title",
+          "url",
+          "canonical_url",
+          "domain",
+          "publisher",
+          "provenance"
+        ],
+        "title": "DiscoveryCandidate"
+      },
+      "DiscoveryProviderResult": {
+        "properties": {
+          "provider": {
+            "type": "string",
+            "const": "google_news",
+            "title": "Provider",
+            "default": "google_news"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "timeout",
+              "malformed_feed",
+              "upstream_error",
+              "throttled",
+              "unsafe_destination",
+              "response_too_large",
+              "parser_limit",
+              "unsupported_encoding"
+            ],
+            "title": "Status",
+            "default": "success"
+          },
+          "candidates": {
+            "items": {
+              "$ref": "#/components/schemas/DiscoveryCandidate"
+            },
+            "type": "array",
+            "maxItems": 75,
+            "title": "Candidates"
+          },
+          "invalid_candidates": {
+            "type": "integer",
+            "title": "Invalid Candidates",
+            "default": 0
+          },
+          "duplicates": {
+            "type": "integer",
+            "title": "Duplicates",
+            "default": 0
+          },
+          "truncated": {
+            "type": "boolean",
+            "title": "Truncated",
+            "default": false
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "retry_after": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retry After"
+          }
+        },
+        "type": "object",
+        "title": "DiscoveryProviderResult"
+      },
+      "DiscoveryRequest": {
+        "properties": {
+          "provider": {
+            "type": "string",
+            "const": "google_news",
+            "title": "Provider",
+            "default": "google_news"
+          },
+          "query": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 1,
+            "pattern": "^[^\\x00-\\x1f\\x7f]+$",
+            "title": "Query"
+          },
+          "limit": {
+            "type": "integer",
+            "maximum": 75.0,
+            "minimum": 1.0,
+            "title": "Limit",
+            "default": 10
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "query"
+        ],
+        "title": "DiscoveryRequest"
+      },
+      "GDELTCandidate": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Title"
+          },
+          "url": {
+            "type": "string",
+            "maxLength": 2048,
+            "title": "Url"
+          },
+          "canonical_url": {
+            "type": "string",
+            "maxLength": 2048,
+            "title": "Canonical Url"
+          },
+          "domain": {
+            "type": "string",
+            "maxLength": 253,
+            "title": "Domain"
+          },
+          "publisher": {
+            "type": "string",
+            "maxLength": 255,
+            "title": "Publisher"
+          },
+          "provider": {
+            "type": "string",
+            "const": "gdelt",
+            "title": "Provider",
+            "default": "gdelt"
+          },
+          "source_type": {
+            "type": "string",
+            "const": "gdelt",
+            "title": "Source Type",
+            "default": "gdelt"
+          },
+          "published_at": {
+            "type": "null",
+            "title": "Published At"
+          },
+          "snippet": {
+            "type": "null",
+            "title": "Snippet"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/GDELTProvenance"
+          }
+        },
+        "type": "object",
+        "required": [
+          "title",
+          "url",
+          "canonical_url",
+          "domain",
+          "publisher",
+          "provenance"
+        ],
+        "title": "GDELTCandidate"
+      },
+      "GDELTProvenance": {
+        "properties": {
+          "entry_index": {
+            "type": "integer",
+            "exclusiveMaximum": 75.0,
+            "minimum": 0.0,
+            "title": "Entry Index"
+          },
+          "original_url": {
+            "type": "string",
+            "maxLength": 2048,
+            "title": "Original Url"
+          },
+          "reported_domain": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reported Domain"
+          },
+          "provider_item_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2048
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider Item Id"
+          },
+          "seen_raw": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seen Raw"
+          },
+          "seen_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seen At"
+          },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language"
+          },
+          "source_country": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Country"
+          },
+          "original_mobile_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2048
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Original Mobile Url"
+          },
+          "mobile_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2048
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mobile Url"
+          },
+          "original_image_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2048
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Original Image Url"
+          },
+          "image_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2048
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Url"
+          },
+          "warnings": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "invalid_seen_date",
+                "invalid_mobile_url",
+                "invalid_image_url"
+              ]
+            },
+            "type": "array",
+            "maxItems": 3,
+            "title": "Warnings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "entry_index",
+          "original_url"
+        ],
+        "title": "GDELTProvenance"
+      },
+      "GDELTRejectedEntry": {
+        "properties": {
+          "entry_index": {
+            "type": "integer",
+            "exclusiveMaximum": 75.0,
+            "minimum": 0.0,
+            "title": "Entry Index"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "invalid_record",
+              "invalid_url",
+              "field_limit"
+            ],
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "entry_index",
+          "reason"
+        ],
+        "title": "GDELTRejectedEntry"
+      },
+      "GDELTRequest": {
+        "properties": {
+          "provider": {
+            "type": "string",
+            "const": "gdelt",
+            "title": "Provider"
+          },
+          "query": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Query"
+          },
+          "limit": {
+            "type": "integer",
+            "maximum": 75.0,
+            "minimum": 1.0,
+            "title": "Limit",
+            "default": 25
+          },
+          "window_hours": {
+            "type": "integer",
+            "maximum": 168.0,
+            "minimum": 1.0,
+            "title": "Window Hours",
+            "default": 24
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "provider",
+          "query"
+        ],
+        "title": "GDELTRequest"
+      },
+      "GDELTResult": {
+        "properties": {
+          "provider": {
+            "type": "string",
+            "const": "gdelt",
+            "title": "Provider",
+            "default": "gdelt"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "incomplete",
+              "disabled",
+              "throttled",
+              "busy",
+              "paused",
+              "storage_unavailable",
+              "timeout",
+              "malformed_response",
+              "upstream_error",
+              "unsafe_destination",
+              "response_too_large",
+              "parser_limit",
+              "unsupported_encoding"
+            ],
+            "title": "Status"
+          },
+          "limit": {
+            "type": "integer",
+            "maximum": 75.0,
+            "minimum": 1.0,
+            "title": "Limit"
+          },
+          "window_hours": {
+            "type": "integer",
+            "maximum": 168.0,
+            "minimum": 1.0,
+            "title": "Window Hours"
+          },
+          "candidates": {
+            "items": {
+              "$ref": "#/components/schemas/GDELTCandidate"
+            },
+            "type": "array",
+            "maxItems": 75,
+            "title": "Candidates"
+          },
+          "rejected_entries": {
+            "items": {
+              "$ref": "#/components/schemas/GDELTRejectedEntry"
+            },
+            "type": "array",
+            "maxItems": 75,
+            "title": "Rejected Entries"
+          },
+          "received_count": {
+            "type": "integer",
+            "maximum": 75.0,
+            "minimum": 0.0,
+            "title": "Received Count",
+            "default": 0
+          },
+          "invalid_candidates": {
+            "type": "integer",
+            "maximum": 75.0,
+            "minimum": 0.0,
+            "title": "Invalid Candidates",
+            "default": 0
+          },
+          "duplicate_observations": {
+            "type": "integer",
+            "maximum": 75.0,
+            "minimum": 0.0,
+            "title": "Duplicate Observations",
+            "default": 0
+          },
+          "limit_reached": {
+            "type": "boolean",
+            "title": "Limit Reached",
+            "default": false
+          },
+          "fetched_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fetched At"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "retry_after": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retry After"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "limit",
+          "window_hours"
+        ],
+        "title": "GDELTResult"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "RSSCandidate": {
+        "properties": {
+          "provider": {
+            "type": "string",
+            "const": "rss",
+            "title": "Provider",
+            "default": "rss"
+          },
+          "source_type": {
+            "type": "string",
+            "const": "rss",
+            "title": "Source Type",
+            "default": "rss"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 8192,
+            "minLength": 1,
+            "title": "Title"
+          },
+          "url": {
+            "type": "string",
+            "maxLength": 2048,
+            "title": "Url"
+          },
+          "canonical_url": {
+            "type": "string",
+            "maxLength": 2048,
+            "title": "Canonical Url"
+          },
+          "domain": {
+            "type": "string",
+            "maxLength": 253,
+            "title": "Domain"
+          },
+          "publisher": {
+            "type": "string",
+            "maxLength": 255,
+            "title": "Publisher"
+          },
+          "published_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Published At"
+          },
+          "snippet": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 65536
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snippet"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/RSSProvenance"
+          }
+        },
+        "type": "object",
+        "required": [
+          "title",
+          "url",
+          "canonical_url",
+          "domain",
+          "publisher",
+          "provenance"
+        ],
+        "title": "RSSCandidate"
+      },
+      "RSSDiscoveryRequest": {
+        "properties": {
+          "provider": {
+            "type": "string",
+            "const": "rss",
+            "title": "Provider"
+          },
+          "feed_id": {
+            "type": "string",
+            "pattern": "^[a-z0-9-]{1,40}$",
+            "title": "Feed Id"
+          },
+          "limit": {
+            "type": "integer",
+            "maximum": 75.0,
+            "minimum": 1.0,
+            "title": "Limit",
+            "default": 75
+          },
+          "cursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1024,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cursor"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "provider",
+          "feed_id"
+        ],
+        "title": "RSSDiscoveryRequest"
+      },
+      "RSSDiscoveryResult": {
+        "properties": {
+          "provider": {
+            "type": "string",
+            "const": "rss",
+            "title": "Provider",
+            "default": "rss"
+          },
+          "feed_id": {
+            "type": "string",
+            "title": "Feed Id"
+          },
+          "feed_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Feed Label"
+          },
+          "feed_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Feed Url"
+          },
+          "feed_revision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Feed Revision"
+          },
+          "feed_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Feed Title"
+          },
+          "format": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "rss2",
+                  "atom"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Format"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "incomplete",
+              "unknown_feed",
+              "invalid_cursor",
+              "cursor_expired",
+              "timeout",
+              "malformed_feed",
+              "upstream_error",
+              "throttled",
+              "unsafe_destination",
+              "response_too_large",
+              "parser_limit",
+              "unsupported_encoding",
+              "storage_unavailable",
+              "busy"
+            ],
+            "title": "Status"
+          },
+          "candidates": {
+            "items": {
+              "$ref": "#/components/schemas/RSSCandidate"
+            },
+            "type": "array",
+            "maxItems": 75,
+            "title": "Candidates"
+          },
+          "rejected_entries": {
+            "items": {
+              "$ref": "#/components/schemas/RSSRejectedEntry"
+            },
+            "type": "array",
+            "maxItems": 75,
+            "title": "Rejected Entries"
+          },
+          "snapshot_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snapshot Id"
+          },
+          "fetched_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fetched At"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "total_entries": {
+            "type": "integer",
+            "title": "Total Entries",
+            "default": 0
+          },
+          "invalid_entries": {
+            "type": "integer",
+            "title": "Invalid Entries",
+            "default": 0
+          },
+          "duplicate_observations": {
+            "type": "integer",
+            "title": "Duplicate Observations",
+            "default": 0
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset",
+            "default": 0
+          },
+          "entries_in_page": {
+            "type": "integer",
+            "title": "Entries In Page",
+            "default": 0
+          },
+          "has_more": {
+            "type": "boolean",
+            "title": "Has More",
+            "default": false
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "retry_after": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retry After"
+          }
+        },
+        "type": "object",
+        "required": [
+          "feed_id",
+          "status"
+        ],
+        "title": "RSSDiscoveryResult"
+      },
+      "RSSProvenance": {
+        "properties": {
+          "entry_index": {
+            "type": "integer",
+            "title": "Entry Index"
+          },
+          "original_url": {
+            "type": "string",
+            "maxLength": 2048,
+            "title": "Original Url"
+          },
+          "provider_item_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2048
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider Item Id"
+          },
+          "published_raw": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 512
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Published Raw"
+          },
+          "date_field": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date Field"
+          },
+          "reported_publisher": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 512
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reported Publisher"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "entry_index",
+          "original_url"
+        ],
+        "title": "RSSProvenance"
+      },
+      "RSSRejectedEntry": {
+        "properties": {
+          "entry_index": {
+            "type": "integer",
+            "title": "Entry Index"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "missing_title",
+              "invalid_url",
+              "field_limit"
+            ],
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "entry_index",
+          "reason"
+        ],
+        "title": "RSSRejectedEntry"
+      },
+      "SourceBatchRegistrationRequest": {
+        "properties": {
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/SourceRegistrationRequest"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "minItems": 1,
+            "title": "Sources"
+          }
+        },
+        "type": "object",
+        "required": [
+          "sources"
+        ],
+        "title": "SourceBatchRegistrationRequest"
+      },
+      "SourceBatchRegistrationResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "completed",
+              "completed_with_errors"
+            ],
+            "title": "Status"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "created": {
+            "type": "integer",
+            "title": "Created"
+          },
+          "duplicates": {
+            "type": "integer",
+            "title": "Duplicates"
+          },
+          "failed": {
+            "type": "integer",
+            "title": "Failed"
+          },
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/SourceBatchResult"
+            },
+            "type": "array",
+            "title": "Results"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "total",
+          "created",
+          "duplicates",
+          "failed"
+        ],
+        "title": "SourceBatchRegistrationResponse"
+      },
+      "SourceBatchResult": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "created",
+              "duplicate",
+              "failed"
+            ],
+            "title": "Status"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "source_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Id"
+          },
+          "canonical_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Canonical Url"
+          },
+          "content_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content Hash"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "SourceBatchResult"
+      },
+      "SourceRecord": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Title"
+          },
+          "url": {
+            "type": "string",
+            "maxLength": 2083,
+            "minLength": 1,
+            "format": "uri",
+            "title": "Url"
+          },
+          "canonical_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2083,
+                "minLength": 1,
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Canonical Url"
+          },
+          "domain": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Domain"
+          },
+          "content_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content Hash"
+          },
+          "publisher": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Publisher"
+          },
+          "published_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Published At"
+          },
+          "source_type": {
+            "type": "string",
+            "title": "Source Type",
+            "default": "unknown"
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Metadata"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "title",
+          "url"
+        ],
+        "title": "SourceRecord"
+      },
+      "SourceRegistrationRequest": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Title"
+          },
+          "url": {
+            "type": "string",
+            "maxLength": 2083,
+            "minLength": 1,
+            "format": "uri",
+            "title": "Url"
+          },
+          "content": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content"
+          },
+          "publisher": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Publisher"
+          },
+          "published_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Published At"
+          },
+          "source_type": {
+            "type": "string",
+            "title": "Source Type",
+            "default": "unknown"
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Metadata"
+          }
+        },
+        "type": "object",
+        "required": [
+          "title",
+          "url"
+        ],
+        "title": "SourceRegistrationRequest"
+      },
+      "SourceRegistryResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "canonical_url": {
+            "type": "string",
+            "title": "Canonical Url"
+          },
+          "domain": {
+            "type": "string",
+            "title": "Domain"
+          },
+          "content_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content Hash"
+          },
+          "publisher": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Publisher"
+          },
+          "published_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Published At"
+          },
+          "source_type": {
+            "type": "string",
+            "title": "Source Type"
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Metadata"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "url",
+          "canonical_url",
+          "domain",
+          "source_type",
+          "created_at"
+        ],
+        "title": "SourceRegistryResponse"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  }
+}

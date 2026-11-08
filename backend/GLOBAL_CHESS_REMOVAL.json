@@ -1,0 +1,794 @@
+{
+  "phase": "6I.2",
+  "source_commit": "7c3121e38001866dad462755decb89718ffbea26",
+  "independent_reference_commit": "ed9df1a60edb7c06890d03385140858e1449af62",
+  "removed_files": [
+    {
+      "path": "backend/app/agents/__init__.py",
+      "category": "A: legacy application",
+      "sha256_before_removal": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "backend/app/agents/research_agent.py",
+      "category": "A: legacy application",
+      "sha256_before_removal": "2883c0a3c4ad3c270696c81fe8493cf87c403eec8fb93c84fa893f4e2dde562f"
+    },
+    {
+      "path": "backend/app/clients/argus_core_client.py",
+      "category": "A: legacy application",
+      "sha256_before_removal": "f2419de5c68937ac962f0db79fec50f8a0d21ae32eb71907c902d62527313cd8"
+    },
+    {
+      "path": "backend/app/clients/classification_contracts.py",
+      "category": "A: legacy application",
+      "sha256_before_removal": "8a6ae89a77d507659ab906737c3bba1997ef6574f27e93864cce78983221e095"
+    },
+    {
+      "path": "backend/app/clients/discovery_contracts.py",
+      "category": "A: legacy application",
+      "sha256_before_removal": "fedb6d4e4fed4d83c56f22466b17e864c2d9326836e750b5dea1b4446be62158"
+    },
+    {
+      "path": "backend/app/clients/global_chess_ollama_client.py",
+      "category": "A: legacy application",
+      "sha256_before_removal": "64895400ab346c99613b8d037222472412b466c9cde54b87b0ef920881bfe3fa"
+    },
+    {
+      "path": "backend/app/clients/rss_discovery_contracts.py",
+      "category": "A: legacy application",
+      "sha256_before_removal": "5ae87eec9d57d1ac6a22db8bf8f92df11b7ba1b8a68f0677200116ad7856e50a"
+    },
+    {
+      "path": "backend/app/clients/source_contracts.py",
+      "category": "A: legacy application",
+      "sha256_before_removal": "0934f3513ea74922e17aad5a8216c5a5377cb39f15e12e99930d5b93d5104c9f"
+    },
+    {
+      "path": "backend/app/config.py",
+      "category": "A: legacy application",
+      "sha256_before_removal": "49285a1bc962489b160875e67a5d5889c3dd12ef8e6cd2ad2ff5ec5346ebcfd3"
+    },
+    {
+      "path": "backend/app/database.py",
+      "category": "A: legacy application",
+      "sha256_before_removal": "71f87bd3898ca295f1fb6c128953f9b0609fb55bff87bf52d0269c3356aaee84"
+    },
+    {
+      "path": "backend/app/global_chess_base.py",
+      "category": "A: legacy application",
+      "sha256_before_removal": "c6be8e7ccf592e5ccf7169206c14fa04aef684bd071a7e14537792ee9ea5184e"
+    },
+    {
+      "path": "backend/app/global_chess_config.py",
+      "category": "A: legacy application",
+      "sha256_before_removal": "a1d2121ce5cf72d676b61d499390c8ab205026e0bdc2a53f34f0d30719be8d7c"
+    },
+    {
+      "path": "backend/app/global_chess_factory.py",
+      "category": "A: legacy application",
+      "sha256_before_removal": "1cdd497d098e1770e9add4c31085c88873f9bc2191193c4a57bf8757d0b29e32"
+    },
+    {
+      "path": "backend/app/global_chess_readiness.py",
+      "category": "A: legacy application",
+      "sha256_before_removal": "bda0608ccf853ac9059a1e3f970bc4533b85026f87d84314b53b880ae9c77bb3"
+    },
+    {
+      "path": "backend/app/main.py",
+      "category": "A: legacy application",
+      "sha256_before_removal": "fcaeb0c64fe92c0fbc6e184bfb2244e2062309be4a106254e3b868b738fb768a"
+    },
+    {
+      "path": "backend/app/models/__init__.py",
+      "category": "A: legacy application",
+      "sha256_before_removal": "0f383062a9f06d96db245ee1f38c0f2a02be49e44214366920455a9cf1837888"
+    },
+    {
+      "path": "backend/app/models/research_source.py",
+      "category": "A: legacy application",
+      "sha256_before_removal": "4f649d3a343d7c9f8b85a52685d23c8a069453f1f987ba967f5e371a5229dd18"
+    },
+    {
+      "path": "backend/app/models/story_cluster.py",
+      "category": "A: legacy application",
+      "sha256_before_removal": "bade39af8f1ea7e4c49c476ce1acccaad82ed375d5677754c31009fb04a2d165"
+    },
+    {
+      "path": "backend/app/models/topic.py",
+      "category": "A: legacy application",
+      "sha256_before_removal": "50963272059122665577af414dae8f676a8408c11398a7076ccd6ebdad14435d"
+    },
+    {
+      "path": "backend/app/models/topic_analysis.py",
+      "category": "A: legacy application",
+      "sha256_before_removal": "badf3a3d96402035ea63e2bf4192f9be06d60282766dd3a237416fc0eff08190"
+    },
+    {
+      "path": "backend/app/routes/__init__.py",
+      "category": "A: legacy application",
+      "sha256_before_removal": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "backend/app/routes/analysis.py",
+      "category": "A: legacy application",
+      "sha256_before_removal": "931cc5ac391c6fc0ca8e69796c2c3a37e3eee1e9b92e8808a1827670b28bda1c"
+    },
+    {
+      "path": "backend/app/routes/health.py",
+      "category": "A: legacy application",
+      "sha256_before_removal": "c9c6828c4d3e85a4589360fb50aba53ce339aa1e147464d83510aac8c7bc3caa"
+    },
+    {
+      "path": "backend/app/routes/ingestion.py",
+      "category": "A: legacy application",
+      "sha256_before_removal": "a309d6593c2e76356a62ad36408fd31cf73debd99f3884fe6597791332baca0a"
+    },
+    {
+      "path": "backend/app/routes/research.py",
+      "category": "A: legacy application",
+      "sha256_before_removal": "ffcf2d56d9d7951cf19079fa52318ef869adf076749fbf97ea02308b6a195764"
+    },
+    {
+      "path": "backend/app/routes/topics.py",
+      "category": "A: legacy application",
+      "sha256_before_removal": "009389506ff14a12c7316e4a622db9239134fe926491d3c3d4999b2912322039"
+    },
+    {
+      "path": "backend/app/schemas.py",
+      "category": "A: legacy application",
+      "sha256_before_removal": "e67344ecde45da2af8ed1da6495cc0abad8c1446472f97ffd5b9c821fd422e6b"
+    },
+    {
+      "path": "backend/app/services/classification_coverage.py",
+      "category": "A: legacy application",
+      "sha256_before_removal": "2b1ec02ca3a846b462c1cf5160ff21a7a96b520f215f3ff59c6eba7fff8203c8"
+    },
+    {
+      "path": "backend/app/services/ingestion_discovery.py",
+      "category": "A: legacy application",
+      "sha256_before_removal": "6ff79cf3c5a420ff92dfb39f9d97f575a135118899c58fd101af0a578379a4c1"
+    },
+    {
+      "path": "backend/app/services/ollama_service.py",
+      "category": "A: legacy application",
+      "sha256_before_removal": "d3ac0574a56a13c2f15489419953dbca320493ebd9fb44f39c2ba2e493ad7c1a"
+    },
+    {
+      "path": "backend/app/services/research_inference.py",
+      "category": "A: legacy application",
+      "sha256_before_removal": "39677f16eb6e9e0609e0c191dedb18a9f794d24161425c4459cd2588bb9894a2"
+    },
+    {
+      "path": "backend/app/services/research_planner.py",
+      "category": "A: legacy application",
+      "sha256_before_removal": "e1cbd6544d2200a4d89a46b0407c7bc284bb7d78641030a77673ea7eaff94d32"
+    },
+    {
+      "path": "backend/app/services/research_service.py",
+      "category": "A: legacy application",
+      "sha256_before_removal": "da0cc07157a77d714c6749067113ed7fd53adfe3507f097088e80187bf2a8599"
+    },
+    {
+      "path": "backend/app/services/rss_service.py",
+      "category": "A: legacy application",
+      "sha256_before_removal": "0d9aed045c186fe835cab21615e3a3b745b2cba3878b701d9015e3959fb8efc6"
+    },
+    {
+      "path": "backend/app/services/rss_utils.py",
+      "category": "A: legacy application",
+      "sha256_before_removal": "b52a4d864a0704a65afb208485106df29e633e464994bd2c8e4ebc889029d840"
+    },
+    {
+      "path": "backend/app/services/synthesis_service.py",
+      "category": "A: legacy application",
+      "sha256_before_removal": "cd3c78df8309747636bbebb75130717c132551ebcd1ba48db5f32ff3eb265d98"
+    },
+    {
+      "path": "backend/app/services/topic_scoring.py",
+      "category": "A: legacy application",
+      "sha256_before_removal": "163afd108d194193df3466306949769c3a9fde5e703c03f3b511fd86a50abe43"
+    },
+    {
+      "path": "backend/global_chess_alembic.ini",
+      "category": "A: legacy application",
+      "sha256_before_removal": "1fd7b6caec0746d6d057c098ade9cd30fbac6ae7414734b67a046e9561c7a453"
+    },
+    {
+      "path": "backend/global_chess_migrations/env.py",
+      "category": "A: legacy application",
+      "sha256_before_removal": "7d769118fe44314fc244d985bc09f5f88ac77596d7a49ed6a446fcfc09a585dd"
+    },
+    {
+      "path": "backend/global_chess_migrations/script.py.mako",
+      "category": "A: legacy application",
+      "sha256_before_removal": "116d035db5d6b4abe2f7e00e60d547bf8396983c741d09af902b184ccc6e0a35"
+    },
+    {
+      "path": "backend/global_chess_migrations/versions/e1b7c42a9d60_initial_global_chess.py",
+      "category": "A: legacy application",
+      "sha256_before_removal": "076a8a469096764c5ebb020f0e6c0e0580a2f3d1ab83171620428031e69bbd69"
+    },
+    {
+      "path": "backend/tests/api/test_global_chess_analysis.py",
+      "category": "D: legacy/mixed tests",
+      "sha256_before_removal": "f3f0e686bf1fa894615c08dfd7083d12611d841c2522814435d7be02ba0f8bea"
+    },
+    {
+      "path": "backend/tests/fixtures/discovery/core_google_news.json",
+      "category": "A: application-only fixture",
+      "sha256_before_removal": "67650809b2f1e0226b78fa1482684c2eb4ae1418cec88872100f942698b09e3d"
+    },
+    {
+      "path": "backend/tests/fixtures/global_chess_openapi.json",
+      "category": "A: application-only fixture",
+      "sha256_before_removal": "b3a3ff8d4bb1a4b16c3850f4f4a341faf42ee8f1e89a9cecc17cea4b5ac88d5e"
+    },
+    {
+      "path": "backend/tests/fixtures/global_chess_schema.json",
+      "category": "A: application-only fixture",
+      "sha256_before_removal": "d6b516b12085b7fbcc34a7bcccb3699851c606a23969c859112a9da125c9b34b"
+    },
+    {
+      "path": "backend/tests/fixtures/relevance_classifier.json",
+      "category": "A: application-only fixture",
+      "sha256_before_removal": "a2e44950b2fdc426a28200e68985cb45a5bba4290d37e053efea5fe8b3b12363"
+    },
+    {
+      "path": "backend/tests/integration/test_global_chess_database_postgres.py",
+      "category": "D: legacy/mixed tests",
+      "sha256_before_removal": "2f3cadfeb20e502ab0b13af0075a4d6473db134e05c892e0a1130e698d7a7a1e"
+    },
+    {
+      "path": "backend/tests/integration/test_global_chess_migrations.py",
+      "category": "D: legacy/mixed tests",
+      "sha256_before_removal": "083ffa76823df9a44e708a36d4d35d3f863a73d82af556fa84f6ad0d5b2a9b3c"
+    },
+    {
+      "path": "backend/tests/integration/test_global_chess_readiness.py",
+      "category": "D: legacy/mixed tests",
+      "sha256_before_removal": "6e862fe1f64ddcf28e56d7d781126090847cd335596fded338ef7a5829883cd1"
+    },
+    {
+      "path": "backend/tests/test_argus_core_client.py",
+      "category": "D: legacy/mixed tests",
+      "sha256_before_removal": "1bc9755ee3800d30d063efa2608c3a355e3c96f7cf19f92859dbfe3870475ce2"
+    },
+    {
+      "path": "backend/tests/test_classification_size.py",
+      "category": "D: legacy/mixed tests",
+      "sha256_before_removal": "2cd45e5e079ae9275f53ebc9f6477b538e32de24992d8753ef0c4d69977a978a"
+    },
+    {
+      "path": "backend/tests/test_global_chess_database.py",
+      "category": "D: legacy/mixed tests",
+      "sha256_before_removal": "0067de9bd738a92faba6a2e366d2c03b452dd08ca7e730ce140b2ac21ffe744b"
+    },
+    {
+      "path": "backend/tests/test_global_chess_discovery.py",
+      "category": "D: legacy/mixed tests",
+      "sha256_before_removal": "1f24243842c36ce96d19bebd2142d600e1e5d1ec16509dbb48ad67ca38ff3b9f"
+    },
+    {
+      "path": "backend/tests/test_global_chess_rss.py",
+      "category": "D: legacy/mixed tests",
+      "sha256_before_removal": "52d81372253308d0526a532658982a0bead9c1c8e188612f8a390f7e751dd16f"
+    },
+    {
+      "path": "backend/tests/test_global_chess_sources.py",
+      "category": "D: legacy/mixed tests",
+      "sha256_before_removal": "eee4d9fef85287931b3edc343584d33791adb2dcbaed8b243ef819918602c370"
+    },
+    {
+      "path": "backend/tests/test_global_chess_startup.py",
+      "category": "D: legacy/mixed tests",
+      "sha256_before_removal": "af39cc08739739f22203adc5f7cfcfda8639bf3f7187731a2e947bb8369b9a8d"
+    },
+    {
+      "path": "backend/tests/test_google_news.py",
+      "category": "D: legacy/mixed tests",
+      "sha256_before_removal": "dcec280d377036af7273db7e3870f42954779e597afdeb194245cab704bcfae4"
+    },
+    {
+      "path": "backend/tests/test_ingestion_characterization.py",
+      "category": "D: legacy/mixed tests",
+      "sha256_before_removal": "82f1997a7de30c39a73147214b09bc4e0d5f99404db10a831203f16d29a73028"
+    },
+    {
+      "path": "backend/tests/test_ollama_relevance.py",
+      "category": "D: legacy/mixed tests",
+      "sha256_before_removal": "111876c6ebd69639e003d377b99b5c72bb3e23ff3ef4d47c2edd927f51bdfa8e"
+    },
+    {
+      "path": "backend/tests/test_relevance_accuracy.py",
+      "category": "D: legacy/mixed tests",
+      "sha256_before_removal": "f990744907228e9016e766e78f5c4a79dab5e3c8104157fb69d17947ae9b58fc"
+    },
+    {
+      "path": "backend/tests/test_relevance_classifier.py",
+      "category": "D: legacy/mixed tests",
+      "sha256_before_removal": "aad3e696046fd9d701a28b4cf38c6f76b7cdfef67776f4f3d2b9efc9304ac586"
+    },
+    {
+      "path": "backend/tests/test_relevance_core.py",
+      "category": "D: legacy/mixed tests",
+      "sha256_before_removal": "bb5dba78e13c2d8e55cf02a80eade1070694d70bcef012309ff2e70a436abb70"
+    },
+    {
+      "path": "backend/tests/test_research_agent_core.py",
+      "category": "D: legacy/mixed tests",
+      "sha256_before_removal": "ea2105f115780c0ea41cddfb50bf58314cbc47cfe8f86d46281bf76b58002c71"
+    },
+    {
+      "path": "backend/tests/test_research_core_integration.py",
+      "category": "D: legacy/mixed tests",
+      "sha256_before_removal": "9312cce22d2840abe5a6ab8c1736809a79c7d27780417b8a63738ab842e8e476"
+    },
+    {
+      "path": "backend/tests/test_research_deduplication.py",
+      "category": "D: legacy/mixed tests",
+      "sha256_before_removal": "57452152c4ddce50dce08ecff3c49a07fe2e7ff93bc0449177c5c03ae6a4b281"
+    },
+    {
+      "path": "backend/tests/test_research_relevance.py",
+      "category": "D: legacy/mixed tests",
+      "sha256_before_removal": "df0b4fc4a801745caf105929009e0bca8d2a4cabfda1911414f69ccc9d71321d"
+    },
+    {
+      "path": "backend/tests/test_synthesis_service.py",
+      "category": "D: legacy/mixed tests",
+      "sha256_before_removal": "d5366bbc01953de8e446c0f2349b1c55fcb9cef07ed8838f646da651416a071d"
+    }
+  ],
+  "retired_test_modules": [
+    {
+      "path": "backend/tests/api/test_global_chess_analysis.py",
+      "reason": "Global Chess topic-analysis adapter/persistence; producer auth/envelope behavior remains in Core API/auth/AI-admission tests.",
+      "removed_test_functions": [
+        "test_topic_analysis_preserves_response_and_updates_actual_model",
+        "test_upstream_errors_preserve_api_shape_and_do_not_persist",
+        "test_analysis_validation_is_preserved",
+        "test_missing_topic_does_not_call_inference",
+        "test_database_failure_still_rolls_back",
+        "test_missing_configuration_has_no_direct_ollama_fallback",
+        "test_editorial_prompt_and_schema_contract",
+        "test_failed_inference_keeps_existing_analysis_and_filters_retry_after",
+        "test_topic_timeout_response_is_explicit",
+        "test_client_contract_with_real_core_router_and_authentication"
+      ]
+    },
+    {
+      "path": "backend/tests/integration/test_global_chess_database_postgres.py",
+      "reason": "Consumer database/session separation; Core readiness and unrelated-schema isolation retained independently.",
+      "removed_test_functions": [
+        "test_database_dependencies_and_core_readiness_are_independent"
+      ]
+    },
+    {
+      "path": "backend/tests/integration/test_global_chess_migrations.py",
+      "reason": "Consumer Alembic/bootstrap; Core-independent version-history and both-order preservation assertions moved to Core migration tests.",
+      "removed_test_functions": [
+        "test_independent_graph_and_static_ownership",
+        "test_fresh_bootstrap_exact_metadata_indexes_constraints_and_sequences",
+        "test_orm_defaults_generated_ids_persistence_and_database_cascades",
+        "test_both_histories_and_data_are_isolated_in_either_order",
+        "test_existing_unversioned_chess_tables_are_not_adopted_or_overwritten",
+        "test_fresh_cli_environment_has_no_core_imports_or_create_all",
+        "test_missing_explicit_cli_url_cannot_use_legacy_or_dotenv",
+        "test_offline_sql_is_global_chess_only"
+      ]
+    },
+    {
+      "path": "backend/tests/integration/test_global_chess_readiness.py",
+      "reason": "Consumer-only readiness/lifespan; Core readiness suite retained.",
+      "removed_test_functions": [
+        "test_readiness_is_read_only_and_resets_connection_characteristics",
+        "test_unready_databases_fail_without_schema_or_version_writes",
+        "test_wrong_schema_fails_read_only",
+        "test_unavailable_database_error_hides_connection_details",
+        "test_non_postgres_is_rejected_before_connecting",
+        "test_invalid_graph_fails_before_database_access",
+        "test_actual_startup_is_read_only_and_always_disposes_owned_resources",
+        "test_legacy_fallback_cannot_select_startup_database"
+      ]
+    },
+    {
+      "path": "backend/tests/test_argus_core_client.py",
+      "reason": "Application-owned Core HTTP client, not the Core server.",
+      "removed_test_functions": [
+        "test_independent_settings_and_secret_repr",
+        "test_settings_reject_invalid_timeouts",
+        "test_request_contract_and_envelope_adapter",
+        "test_failures_are_explicit_sanitized_and_never_retried",
+        "test_retry_after_is_validated",
+        "test_transport_errors_hide_details_without_retries",
+        "test_malformed_envelopes_fail_without_inventing_a_model",
+        "test_invalid_http_json_is_sanitized",
+        "test_invalid_configuration_fails_before_sending",
+        "test_owned_http_client_disables_environment_proxies_and_closes"
+      ]
+    },
+    {
+      "path": "backend/tests/test_classification_size.py",
+      "reason": "Consumer classification-coverage serialization/resource policy.",
+      "removed_test_functions": [
+        "test_maximum_legal_coverage_and_serializer_overhead",
+        "test_counter_matches_previous_and_http_serializers",
+        "test_exact_inclusive_byte_boundary",
+        "test_existing_source_field_limits",
+        "test_existing_provenance_limits",
+        "test_existing_cardinality_and_invalid_unicode_limits",
+        "test_counting_allocations_do_not_scale_as_a_whole_json_body",
+        "test_actual_success_partial_error_response_compatibility"
+      ]
+    },
+    {
+      "path": "backend/tests/test_global_chess_database.py",
+      "reason": "Consumer settings/ORM/session lifecycle; Core metadata/no-consumer dependency assertions retained in Core boundary and migration tests.",
+      "removed_test_functions": [
+        "test_metadata_is_separate_and_five_table_ddl_is_unchanged",
+        "test_engines_sessions_and_dependency_functions_are_distinct",
+        "test_explicit_url_wins_without_fallback_or_secret_disclosure",
+        "test_development_compatibility_preserves_exact_legacy_url_and_warns",
+        "test_missing_explicit_database_fails_outside_development",
+        "test_both_environment_flags_are_respected",
+        "test_missing_database_or_disabled_compatibility_fails_clearly",
+        "test_explicit_blank_url_never_falls_back",
+        "test_session_dependency_closes_its_own_session_exactly_once",
+        "test_dependency_rollback_preserves_committed_records",
+        "test_actual_chess_lifespan_disposes_only_chess_engine",
+        "test_core_shutdown_does_not_dispose_chess_engine",
+        "test_fresh_process_database_boundary",
+        "test_no_chess_runtime_imports_core_database"
+      ]
+    },
+    {
+      "path": "backend/tests/test_global_chess_discovery.py",
+      "reason": "Consumer discovery/editorial/persistence adaptation; Core discovery/auth/provider/security assertions retained in Core suites.",
+      "removed_test_functions": [
+        "test_rss_first_budgets_classification_reviews_dedup_and_diversity",
+        "test_candidate_budget_stays_capped_at_75",
+        "test_partial_failure_is_an_error_with_retained_sources",
+        "test_rss_snapshot_failure_partial_headers_and_persistence",
+        "test_agent_rss_failure_keeps_evidence_and_stops_inference",
+        "test_research_route_persists_only_existing_fields_and_updates_as_before",
+        "test_route_failure_and_partial_persistence",
+        "test_topic_approval_and_missing_topic_still_prevent_discovery",
+        "test_rss_review_queue_survives_core_failure_without_inserting_sources",
+        "test_failed_core_request_leaves_existing_records_unchanged",
+        "test_research_write_failure_still_rolls_back",
+        "test_agent_keeps_partial_evidence_without_more_core_requests",
+        "test_later_round_failure_keeps_previous_google_evidence",
+        "test_actual_core_router_contract_and_authentication"
+      ]
+    },
+    {
+      "path": "backend/tests/test_global_chess_rss.py",
+      "reason": "Consumer RSS snapshot adaptation/editorial filtering; Core provider/pagination/quota/security tests retained.",
+      "removed_test_functions": [
+        "test_authenticated_all_pages_order_duplicates_and_adapter",
+        "test_later_page_failure_retains_evidence_without_retry",
+        "test_timeout_and_invalid_retry_after",
+        "test_inconsistent_snapshot_rejected_without_accepting_bad_page",
+        "test_malformed_candidate_is_explicit_failure",
+        "test_empty_and_bounded_full_feed",
+        "test_repeated_cursor_with_remaining_pages",
+        "test_later_page_filtering_winner_selection_and_feed_order",
+        "test_partial_rss_coverage_retains_selected_evidence_and_google",
+        "test_real_core_wire_contract_with_mocked_provider",
+        "test_collection_total_deadline_keeps_prior_pages",
+        "test_malformed_or_excessive_responses",
+        "test_invalid_feed_id_fails_before_http",
+        "test_equal_overlap_keeps_first_observation_and_feed_label"
+      ]
+    },
+    {
+      "path": "backend/tests/test_global_chess_sources.py",
+      "reason": "Consumer identity client/privacy; Core normalization/hash vectors retained directly without the client.",
+      "removed_test_functions": [
+        "test_created_identity_preserves_observation_and_public_wire",
+        "test_created_full_article_fingerprint_is_verified",
+        "test_url_duplicate_is_not_a_merge_or_publisher_update",
+        "test_cross_url_content_duplicate_is_only_a_review_candidate",
+        "test_same_url_content_race_retains_wire_reason",
+        "test_identity_conflicts_never_merge",
+        "test_editorial_fields_are_rejected_not_forwarded",
+        "test_unsafe_or_secret_bearing_observed_urls_are_rejected",
+        "test_full_article_requires_explicit_opt_in_and_is_not_in_repr",
+        "test_current_core_normalization_and_hash_contract_without_core_runtime_access",
+        "test_registration_does_not_invent_publication_times",
+        "test_invalid_lookup_ids_fail_before_http",
+        "test_legacy_opaque_ids_supported_and_metadata_never_exported",
+        "test_http_errors_are_sanitized_and_not_retried",
+        "test_retry_after_validation",
+        "test_ambiguous_lost_write_responses_are_never_replayed",
+        "test_failed_followup_retains_receipt_for_read_only_reconciliation",
+        "test_verification_failures_never_replay_acknowledged_writes",
+        "test_commit_then_lost_receipt_stays_unknown_until_explicit_reconciliation",
+        "test_only_explicit_typed_registrations_are_accepted",
+        "test_invalid_configuration_does_not_attempt_a_write",
+        "test_normalized_url_expansion_is_rejected_before_registration",
+        "test_lookup_not_found_is_read_only",
+        "test_malformed_receipts_have_unknown_write_outcome",
+        "test_inconsistent_lookups_do_not_resolve_identity",
+        "test_bounded_streaming_protocol_errors_close_response",
+        "test_total_request_deadline_is_not_reset_by_streaming",
+        "test_owned_client_disables_proxies_and_closes"
+      ]
+    },
+    {
+      "path": "backend/tests/test_global_chess_startup.py",
+      "reason": "Consumer factory/settings/OpenAPI; Core import/lifespan boundary retained.",
+      "removed_test_functions": [
+        "test_existing_openapi_metadata_routes_and_middleware_are_preserved",
+        "test_application_factory_uses_owned_settings_and_explicit_overrides",
+        "test_factory_preserves_callback_order_and_cleanup_on_startup_failure",
+        "test_factory_without_callbacks_has_no_database_side_effects",
+        "test_legacy_aliases_and_owned_overrides_preserve_provider_configuration",
+        "test_compatibility_exports_feed_order_and_scoring_defaults",
+        "test_invalid_application_policy_fails_without_secret_values",
+        "test_settings_mask_provider_and_api_secrets",
+        "test_legacy_classifier_client_keeps_original_ollama_wire_behavior",
+        "test_public_responses_and_logs_do_not_expose_configured_keys",
+        "test_fresh_process_application_import_boundary",
+        "test_application_owned_modules_do_not_import_core_factory_or_settings"
+      ]
+    },
+    {
+      "path": "backend/tests/test_google_news.py",
+      "reason": "Despite its filename, tests the consumer HTTP discovery adapter; Core Google News provider/API tests retained.",
+      "removed_test_functions": [
+        "test_google_news_discovers_articles",
+        "test_successful_empty_results_are_not_failures",
+        "test_invalid_queries_and_limits_fail_before_request",
+        "test_failures_are_explicit_sanitized_and_not_retried",
+        "test_timeouts_and_network_failures",
+        "test_malformed_envelopes_and_candidates_fail_closed",
+        "test_invalid_json_and_retry_after_are_sanitized",
+        "test_missing_configuration_never_falls_back",
+        "test_owned_client_disables_proxies_and_closes"
+      ]
+    },
+    {
+      "path": "backend/tests/test_ingestion_characterization.py",
+      "reason": "Consumer editorial scoring, topic ingestion, deduplication and persistence.",
+      "removed_test_functions": [
+        "test_config_and_session_defaults",
+        "test_ingest_contract_and_new_topic_defaults",
+        "test_existing_topic_retains_editorial_state_and_erases_missing_date",
+        "test_second_ingestion_updates_previously_committed_topic",
+        "test_duplicate_new_normalized_url_inserts_once_and_preserves_other_work",
+        "test_duplicate_existing_url_counts_once_and_last_one_wins",
+        "test_only_new_duplicate_observations_count_as_one_insert_and_no_updates",
+        "test_mixed_urls_count_distinct_new_and_existing_topics",
+        "test_invalid_later_duplicate_cannot_replace_last_valid_observation",
+        "test_database_unique_url_protection_is_unchanged",
+        "test_missing_or_blank_required_fields_are_silently_skipped",
+        "test_partial_feed_failures_retain_valid_observations",
+        "test_all_feeds_fail_still_returns_200_with_sanitized_errors",
+        "test_real_sql_writes_rollback_if_commit_fails",
+        "test_no_sql_insert_occurs_between_feed_reads",
+        "test_title_is_scored_before_storage_truncation",
+        "test_unsafe_client_candidates_are_rejected",
+        "test_oversized_urls_are_rejected_before_writes",
+        "test_legacy_parser_and_typed_ingestion_dates",
+        "test_scoring_policy",
+        "test_authenticated_snapshot_pagination_persistence_and_provenance",
+        "test_later_page_errors_retain_partial_topics_without_retry",
+        "test_incomplete_snapshot_retains_accepted_entries_and_reports_coverage",
+        "test_invalid_core_candidates_never_reach_database",
+        "test_complete_500_observation_snapshot_is_not_truncated",
+        "test_collection_deadline_retains_prior_pages",
+        "test_empty_success_and_invalid_retry_guidance",
+        "test_oversized_snapshot_is_explicit_failure",
+        "test_core_http_success_does_not_weaken_commit_rollback"
+      ]
+    },
+    {
+      "path": "backend/tests/test_ollama_relevance.py",
+      "reason": "Live consumer editorial-classification evaluation, not Core server behavior.",
+      "removed_test_functions": [
+        "test_relevant_israel_election_article",
+        "test_unrelated_us_election_article"
+      ]
+    },
+    {
+      "path": "backend/tests/test_relevance_accuracy.py",
+      "reason": "Live consumer editorial-classification evaluation, not Core server behavior.",
+      "removed_test_functions": [
+        "test_relevance_accuracy"
+      ]
+    },
+    {
+      "path": "backend/tests/test_relevance_classifier.py",
+      "reason": "Live consumer editorial-classification evaluation, not Core server behavior.",
+      "removed_test_functions": [
+        "test_article_relevance_classification"
+      ]
+    },
+    {
+      "path": "backend/tests/test_relevance_core.py",
+      "reason": "Consumer classifier/coverage/budget/editorial rules; Core AI auth/quota/admission/error tests retained.",
+      "removed_test_functions": [
+        "test_exact_editorial_wire_contract_and_actual_model",
+        "test_output_validation_never_calls_failure_irrelevant",
+        "test_core_failures_sanitized_no_retry",
+        "test_transport_and_envelope_failure_types",
+        "test_complete_user_prompt_boundary_without_truncation",
+        "test_system_prompt_guard_with_original_text",
+        "test_oversized_observation_retained_and_not_suppressed_in_later_explicit_operation",
+        "test_individual_failure_continues_preserving_order_reviews_and_duplicate_winner",
+        "test_systemic_failure_preserves_earlier_evidence_and_known_remaining",
+        "test_operator_bounds_retain_remaining_candidates",
+        "test_active_deadline_or_cancellation_preserves_evidence_and_cleanup",
+        "test_public_coverage_allowlist_dates_and_full_description",
+        "test_coverage_cardinality_and_worst_case_serialized_bound",
+        "test_workload_configuration_fail_closed",
+        "test_api_error_or_partial_coverage_preserves_persistence",
+        "test_agent_shares_budget_across_rounds_and_stops_before_more_inference",
+        "test_anyio_scope_cancellation_preserves_completed_observations",
+        "test_classifier_through_real_core_authentication_and_admission_contract",
+        "test_classification_authentication_failure_is_not_masked_by_prior_feed_failure"
+      ]
+    },
+    {
+      "path": "backend/tests/test_research_agent_core.py",
+      "reason": "Consumer research-agent iteration/stopping/partial evidence.",
+      "removed_test_functions": [
+        "test_agent_http_integration_preserves_stopping_and_partial_results",
+        "test_agent_stops_on_core_failure_without_extra_inference_or_discovery"
+      ]
+    },
+    {
+      "path": "backend/tests/test_research_core_integration.py",
+      "reason": "Consumer planning/evaluation/synthesis adaptation; Core AI prompt boundaries retained directly.",
+      "removed_test_functions": [
+        "test_research_authenticated_http_contract",
+        "test_research_core_failures_are_sanitized_without_retries",
+        "test_research_timeout_and_validation",
+        "test_unconfigured_research_does_not_fall_back",
+        "test_oversized_prompts_fail_before_inference",
+        "test_prompt_limits_match_core_contract",
+        "test_datetime_serialization_and_existing_source_caps",
+        "test_synthesis_rejects_invented_citations_across_sections",
+        "test_research_with_real_core_router_and_auth"
+      ]
+    },
+    {
+      "path": "backend/tests/test_research_deduplication.py",
+      "reason": "Consumer processed-URL/editorial-review deduplication.",
+      "removed_test_functions": [
+        "test_processed_urls_are_not_classified_again",
+        "test_partial_matches_are_not_duplicated"
+      ]
+    },
+    {
+      "path": "backend/tests/test_research_relevance.py",
+      "reason": "Consumer entity/topic editorial relevance policy.",
+      "removed_test_functions": [
+        "test_israel_election_headline_matches",
+        "test_unrelated_us_house_election_does_not_match",
+        "test_unrelated_headline_does_not_match",
+        "test_netanyahu_election_headline_matches",
+        "test_house_races_headline_is_excluded",
+        "test_gdp_headline_is_excluded",
+        "test_israel_deadlock_article_matches",
+        "test_netanyahu_election_article_matches",
+        "test_us_house_races_article_is_rejected",
+        "test_unrelated_gdp_article_is_rejected"
+      ]
+    },
+    {
+      "path": "backend/tests/test_synthesis_service.py",
+      "reason": "Consumer synthesis prompts, citation policy and structured editorial output.",
+      "removed_test_functions": [
+        "test_synthesize_research_success",
+        "test_synthesize_research_rejects_unknown_source_url",
+        "test_synthesize_research_rejects_empty_sources",
+        "test_synthesize_research_rejects_invalid_model_output"
+      ]
+    }
+  ],
+  "preserved_shared_utilities": [
+    "backend/app/utils/source_normalization.py",
+    "backend/app/utils/deduplication.py"
+  ],
+  "reclassified_core_assertions": [
+    "AIRequest exact 10000/30000 prompt acceptance/rejection boundaries",
+    "SourceRegistrationRequest URL normalization and full-content fingerprint vectors",
+    "Six Core-owned tables and empty legacy Core Base metadata",
+    "Core startup/shutdown without consumer packages/settings",
+    "Independent version table and populated foreign schema/data survival in both orders, including Core downgrade"
+  ],
+  "dependency_removals": [
+    "feedparser==6.0.14",
+    "feedparser-sgmllib==2.1.0"
+  ],
+  "retained_core_test_modules": [
+    "backend/tests/api/test_ai.py",
+    "backend/tests/api/test_articles.py",
+    "backend/tests/api/test_discovery.py",
+    "backend/tests/api/test_gdelt.py",
+    "backend/tests/api/test_health.py",
+    "backend/tests/api/test_source_batch.py",
+    "backend/tests/api/test_source_listing.py",
+    "backend/tests/api/test_sources.py",
+    "backend/tests/integration/test_audit_postgres.py",
+    "backend/tests/integration/test_database_readiness.py",
+    "backend/tests/integration/test_migration_bootstrap.py",
+    "backend/tests/integration/test_source_admission_postgres.py",
+    "backend/tests/integration/test_source_registry_postgres.py",
+    "backend/tests/test_ai_capacity.py",
+    "backend/tests/test_api_key_management.py",
+    "backend/tests/test_api_key_service.py",
+    "backend/tests/test_application_service.py",
+    "backend/tests/test_article_extraction.py",
+    "backend/tests/test_article_fetch_security.py",
+    "backend/tests/test_auth.py",
+    "backend/tests/test_core_import_boundary.py",
+    "backend/tests/test_deduplication.py",
+    "backend/tests/test_discovery_fetch.py",
+    "backend/tests/test_discovery_pagination_limits.py",
+    "backend/tests/test_discovery_provider.py",
+    "backend/tests/test_gdelt_admission.py",
+    "backend/tests/test_gdelt_discovery.py",
+    "backend/tests/test_permissions.py",
+    "backend/tests/test_rate_limit.py",
+    "backend/tests/test_rate_limiter.py",
+    "backend/tests/test_request_audit.py",
+    "backend/tests/test_rss_discovery.py",
+    "backend/tests/test_rss_fetch.py",
+    "backend/tests/test_rss_store.py",
+    "backend/tests/test_source_admission.py",
+    "backend/tests/test_source_catalog_policy.py",
+    "backend/tests/test_source_registry.py"
+  ],
+  "new_core_test_modules": [
+    "backend/tests/test_core_contracts.py"
+  ],
+  "modified_files": [
+    "backend/CORE_TEST_ISOLATION.md",
+    "backend/DATABASE_STARTUP.md",
+    "backend/GLOBAL_CHESS_CORE_INTEGRATION.md",
+    "backend/GLOBAL_CHESS_DATABASE.md",
+    "backend/GLOBAL_CHESS_SOURCE_IDENTITY.md",
+    "backend/GLOBAL_CHESS_STARTUP.md",
+    "backend/INGESTION_CHARACTERIZATION.md",
+    "backend/requirements.txt",
+    "backend/tests/conftest.py",
+    "backend/tests/integration/test_migration_bootstrap.py",
+    "backend/tests/test_core_import_boundary.py",
+    "pytest-core.ini",
+    "pytest.ini"
+  ],
+  "created_files": [
+    "README.md",
+    "backend/GLOBAL_CHESS_REMOVAL.json",
+    "backend/GLOBAL_CHESS_SEPARATION.md",
+    "backend/tests/fixtures/core_openapi.json",
+    "backend/tests/test_core_contracts.py"
+  ],
+  "validation": {
+    "baseline_core_passed": 772,
+    "baseline_seconds": 98.88,
+    "final_default_passed": 778,
+    "failed": 0,
+    "skipped": 0,
+    "warnings": 1,
+    "final_seconds": 68.53,
+    "default_and_profile_identical_node_ids": 778,
+    "core_openapi_paths": 9,
+    "core_openapi_sha256": "91531845673770d801f70b00f633f6fb4a437f489fcf80f312142d5924c15c89",
+    "independent_repository_unchanged": true,
+    "cleanup": {
+      "disposable_child_databases": 0,
+      "redis_keys": 0,
+      "containers_removed": true,
+      "tmpfs_removed": true,
+      "ports_closed": [
+        16000,
+        16001
+      ],
+      "temporary_environment_and_logs_removed": true
+    }
+  }
+}

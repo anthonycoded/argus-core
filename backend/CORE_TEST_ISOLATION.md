@@ -1,14 +1,14 @@
-# Core tests before legacy application removal
+# Core test isolation after legacy application removal
 
-Phase 6I.1 retains all legacy application files but removes Core test imports of
-their implementation. No runtime modules, API contracts or migration files change.
+Phase 6I.1 isolated Core tests; Phase 6I.2 removes the reviewed legacy application
+files. Core-owned runtime modules, API contracts and Core migration files are unchanged.
 
-Run the Core-owned selection with `python -m pytest -c pytest-core.ini`.
-The selection includes all 36 existing Core test modules plus a standalone
-composition regression. Its conftest import guard rejects legacy application
-models, databases, settings, routes, agents, clients and editorial services during
-collection and execution. This is a separate selection; the original default
-suite and legacy application tests remain for the later removal milestone.
+Run the default selection with `python -m pytest` or the explicit profile with
+`python -m pytest -c pytest-core.ini`. Both contain Core tests only. The conftest
+import guard rejects removed consumer models, databases, settings, routes, agents,
+clients and editorial services during collection and execution. No consumer
+configuration is required. Core assertions rescued from mixed modules are tested
+directly; the full Core OpenAPI is compared with its pre-removal snapshot.
 
 ## Preserved boundaries
 
@@ -35,17 +35,18 @@ suite and legacy application tests remain for the later removal milestone.
   or audit middleware. Healthy/failing startup, read-only SQL, pool reset, revision
   checks, opt-in auditing and cleanup assertions remain.
 
-Producer/client integration tests that themselves exercise legacy Global Chess
-belong to the later deletion/reclassification milestone. Those files have not been
-changed here. Negative import guards may name legacy modules; frozen sentinel
-table names are historical fixtures, not application dependencies.
+Producer/client integration tests exercising legacy Global Chess were retired.
+Their retirement and retained Core assertions are recorded in GLOBAL_CHESS_REMOVAL.json.
+Negative import guards may name legacy modules; frozen sentinel table names are
+historical fixtures, not application dependencies.
 
 ## Dependencies and safe validation
 
 `redis==8.1.0` matches the already-installed and previously exercised Python
 client. Core uses redis.asyncio and redis.exceptions in its connection, rate-limit,
-AI admission, GDELT admission and RSS snapshot implementations. No other declared
-dependency is upgraded or pruned in this milestone.
+AI admission, GDELT admission and RSS snapshot implementations. Phase 6I.2 removes
+only feedparser/feedparser-sgmllib, which have no remaining Core imports or required
+dependency consumers. No retained version is upgraded.
 
 Validate dependency declarations in a fresh temporary virtual environment with
 the source-tested versions constrained, then run pip check. Redis server image
@@ -86,11 +87,11 @@ zero Redis keys remaining. Both task-owned containers and their tmpfs storage we
 removed and both test ports closed. Temporary test/dependency resources were
 removed; no persistent services or independent application repository were changed.
 
-## Legacy selection retained for the removal milestone
+## Legacy selection retired in Phase 6I.2
 
-The default pytest.ini still collects the combined repository. These 22 legacy,
-consumer-client or mixed modules intentionally remain untouched and outside the
-Core-only selection; retire/reclassify them together with the legacy code later:
+These 22 legacy, consumer-client or mixed modules were retired. Their complete
+function inventory, ownership rationale and retained Core assertions are recorded
+in GLOBAL_CHESS_REMOVAL.json:
 
 ```text
 backend/tests/api/test_global_chess_analysis.py
@@ -117,9 +118,46 @@ backend/tests/test_research_relevance.py
 backend/tests/test_synthesis_service.py
 ```
 
-Core's selected tests and fixtures have no executable imports of that application.
-The frozen unrelated table names and negative import-guard module names are
-intentional. Legacy source modules/settings/migrations, default-suite selection,
-historical documentation and consumer-specific dependencies remain for the
-separate reviewed removal/dependency-pruning milestone. Do not delete only the
-application files while leaving their tests in the default combined selection.
+Core's tests and fixtures have no executable imports of that application. Frozen
+unrelated table names and negative import-guard module names are intentional.
+Global Chess-specific documentation files now link to GLOBAL_CHESS_SEPARATION.md;
+Core security/provider/source/database documentation remains maintained here.
+
+## Phase 6I.2 validation
+
+Pre-removal Core profile: 772 passed, 0 failed, 0 skipped, 1 existing warning in
+98.88 seconds. Post-removal default suite in a fresh constrained environment:
+778 passed, 0 failed, 0 skipped, 1 existing warning in 68.53 seconds. The warning
+is the existing Starlette TestClient/httpx deprecation. Both default and explicit
+Core profiles collect the same 778 node IDs. All original Core test functions
+remain; six direct contract/foreign-version-history cases preserve assertions
+rescued from retired consumer tests.
+
+Full Core OpenAPI (9 paths) exactly equals the pre-removal snapshot in
+`tests/fixtures/core_openapi.json`; SHA-256 is
+91531845673770d801f70b00f633f6fb4a437f489fcf80f312142d5924c15c89.
+Preserved runtime/shared-utility/Core-migration hashes match the pre-removal commit.
+Core migrations still have one root/head and initialize only six Core tables.
+The enhanced isolation tests preserve unrelated schema/data/version rows in both
+schema orders and across Core downgrade. Startup/readiness and cleanup regressions
+pass with no Global Chess settings or Python implementation.
+
+Fresh requirements installation omits feedparser and sgmllib entirely, retains
+redis 8.1.0 and every other installed version from the constrained baseline, and
+passes pip check. No persistent database or live provider was used. Validation
+used independently verified task-owned PostgreSQL/Redis with temporary storage,
+disabled Redis persistence, and network/DNS/database guards. The independent
+Global Chess HEAD and clean working tree were verified unchanged.
+
+GLOBAL_CHESS_REMOVAL.json records all removed/modified/created paths and every
+retired test function with ownership rationale. Core source files, migration
+history, provider enablement, authentication and source-registration behavior are
+unchanged. No Git commit, push or merge is performed.
+
+
+Cleanup verified zero child databases and no session fixture tables, with Redis
+empty. Both task-owned containers/tmpfs stores were removed, both test ports closed,
+and the fresh virtual environment plus temporary runner/plans/logs were removed.
+Changed-file and captured-output scans found only synthetic negative-test URI
+parameters in collection output, with no real secrets. Tracked/untracked diff
+checks passed; the independent Global Chess repository remains unchanged.

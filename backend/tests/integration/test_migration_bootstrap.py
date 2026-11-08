@@ -187,6 +187,33 @@ def test_core_upgrade_and_disposable_downgrade_leave_unrelated_tables_untouched(
         assert not (set(CoreBase.metadata.tables) & set(inspect(connection).get_table_names()))
 
 
+@pytest.mark.parametrize("first", ["core", "unrelated"])
+def test_core_preserves_independent_version_history_in_either_order(migration_engine, unrelated_application_schema, first):
+    """Retain Core isolation assertions from the former two-application tests."""
+    with migration_engine.begin() as connection:
+        cfg = configuration(connection)
+        if first == "core":
+            command.upgrade(cfg, "head")
+        create_unrelated_data(connection, unrelated_application_schema)
+        connection.exec_driver_sql("CREATE TABLE unrelated_alembic_version (version_num varchar(32) PRIMARY KEY)")
+        connection.exec_driver_sql("INSERT INTO unrelated_alembic_version VALUES ('application-fixture-head')")
+        foreign_tables = unrelated_application_schema.names | {"unrelated_alembic_version"}
+        before = snapshot(connection, foreign_tables)
+        command.upgrade(cfg, "head")
+        assert_core_matches(connection)
+        seed_core(connection)
+        all_tables = foreign_tables | set(CoreBase.metadata.tables)
+        complete = snapshot(connection, all_tables)
+        command.check(cfg)
+        command.upgrade(cfg, "head")
+        assert snapshot(connection, all_tables) == complete
+        assert snapshot(connection, foreign_tables) == before
+        command.downgrade(cfg, "base")
+        assert snapshot(connection, foreign_tables) == before
+        assert connection.execute(text("SELECT version_num FROM unrelated_alembic_version")).scalar_one() == "application-fixture-head"
+        assert not (set(CoreBase.metadata.tables) & set(inspect(connection).get_table_names()))
+
+
 def test_duplicates_fail_without_changing_or_deleting_data(migration_engine):
     with migration_engine.begin() as connection:
         command.upgrade(configuration(connection), BASELINE)

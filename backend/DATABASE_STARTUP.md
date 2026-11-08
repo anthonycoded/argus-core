@@ -37,11 +37,10 @@ at head. Investigate drift and use a reviewed migration/restore procedure. Do no
 blindly stamp unversioned populated databases or recreate populated tables.
 
 Shutdown callbacks still run if startup validation fails: Redis and the audit
-pool are closed as before. Global Chess (`app.main`) retains its separate,
-existing Base.metadata.create_all() initialization behavior temporarily until
-Phase 6E, now using its own database module and shutdown cleanup. See
-[GLOBAL_CHESS_DATABASE.md](GLOBAL_CHESS_DATABASE.md) for the explicit setting and
-development-only compatibility path. Other factory users
+pool are closed as before. Global Chess is an independent application and owns
+its database, migrations and lifecycle in its separate repository; its legacy
+entry point and database configuration are no longer part of Core. See
+[GLOBAL_CHESS_SEPARATION.md](GLOBAL_CHESS_SEPARATION.md). Other factory users
 may continue to use the existing synchronous initialization callback; the new
 asynchronous check hook is optional.
 
