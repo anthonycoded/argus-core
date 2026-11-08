@@ -13,7 +13,6 @@ from sqlalchemy.pool import StaticPool
 from app.api.v1.discovery import get_gdelt_provider
 from app.api.v1.router import api_router
 from app.core.database import get_db
-from app.database import Base
 from app.core.models import APIKeyDB,ApplicationDB,AuditLogDB,CoreBase,SourceRecordDB
 from app.core import rate_limit
 from app.factory import create_app
@@ -30,11 +29,13 @@ class Body(httpx.AsyncByteStream):
 
 
 @pytest.fixture
-def context(monkeypatch):
-    from app import models
+def context(monkeypatch, unrelated_application_schema):
     monkeypatch.setattr(httpcore.AsyncConnectionPool,"handle_async_request",AsyncMock(side_effect=AssertionError("Live HTTP")))
     engine=create_engine("sqlite://",connect_args={"check_same_thread":False},poolclass=StaticPool)
-    CoreBase.metadata.create_all(engine);Base.metadata.create_all(engine);sessions=sessionmaker(bind=engine)
+    CoreBase.metadata.create_all(engine)
+    with engine.begin() as connection:
+        unrelated = unrelated_application_schema.create(connection)
+    sessions=sessionmaker(bind=engine)
     keys=[]
     with sessions() as db:
         application=ApplicationDB(name="GDELT tests",slug="gdelt-tests");db.add(application);db.flush()
@@ -67,7 +68,7 @@ def context(monkeypatch):
                limiter=limiter,sessions=sessions,writes=writes)
     with sessions() as db:
         assert db.scalar(select(func.count()).select_from(SourceRecordDB))==0
-        for table in Base.metadata.sorted_tables:assert db.scalar(select(func.count()).select_from(table))==0
+        for table in unrelated.sorted_tables:assert db.scalar(select(func.count()).select_from(table))==0
     engine.dispose()
 
 

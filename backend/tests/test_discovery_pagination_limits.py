@@ -17,7 +17,6 @@ from sqlalchemy.pool import StaticPool
 
 from app.api.v1.discovery import get_discovery_provider, get_rss_provider
 from app.api.v1.router import api_router
-from app.clients.argus_core_client import ArgusCoreClient
 from app.core import rate_limit
 from app.core.database import get_db
 from app.core.models import APIKeyDB, ApplicationDB, CoreBase
@@ -120,12 +119,33 @@ def audits(context):
 
 @pytest.mark.asyncio
 async def test_two_full_snapshots_plus_google_fit_and_every_page_is_audited(context):
-    client = ArgusCoreClient(base_url="http://core.test", api_key=context.identities[0].key, http_client=context.http)
     for feed_id in ("bbc-world", "npr-politics"):
-        sources = await client.discover_rss(feed_id=feed_id)
+        sources = []
+        cursor = None
+        seen_cursors = set()
+        snapshot_id = None
+        for page_number in range(7):
+            response = await post(context, feed_id=feed_id, cursor=cursor)
+            assert response.status_code == 200
+            page = response.json()
+            assert page["feed_id"] == feed_id and page["status"] == "success"
+            assert page["offset"] == len(sources) and page["total_entries"] == 500
+            assert page["entries_in_page"] == len(page["candidates"]) == min(75, 500 - len(sources))
+            snapshot_id = snapshot_id or page["snapshot_id"]
+            assert page["snapshot_id"] == snapshot_id
+            sources.extend(page["candidates"])
+            if not page["has_more"]:
+                assert page_number == 6 and page["next_cursor"] is None
+                break
+            cursor = page["next_cursor"]
+            assert cursor and cursor not in seen_cursors
+            seen_cursors.add(cursor)
         assert len(sources) == 500
-        assert [s["provider_metadata"]["provenance"]["entry_index"] for s in sources] == list(range(500))
-    assert (await client.discover_google_news(query="Ukraine NATO tensions")).candidates == []
+        assert [s["provenance"]["entry_index"] for s in sources] == list(range(500))
+    response = await context.http.post("/api/v1/discovery",
+        headers={"X-API-Key": context.identities[0].key},
+        json={"provider": "google_news", "query": "Ukraine NATO tensions", "limit": 10})
+    assert response.status_code == 200 and response.json()["candidates"] == []
     for kind in ("application", "key"):
         assert await count(context, "general", kind=kind) == 15
         assert await count(context, "discovery", kind=kind) == 3

@@ -12,7 +12,6 @@ from sqlalchemy.pool import StaticPool
 from app.api.v1.discovery import get_discovery_provider
 from app.api.v1.router import api_router
 from app.core.database import get_db
-from app.database import Base
 from app.core.models import CoreBase, ApplicationDB, APIKeyDB, SourceRecordDB
 from app.factory import create_app
 from app.services.api_key_service import generate_api_key
@@ -30,14 +29,14 @@ class Body(httpx.AsyncByteStream):
 
 
 @pytest.fixture
-def context(monkeypatch):
-    from app import models  # Register Global Chess tables only in in-memory SQLite.
+def context(monkeypatch, unrelated_application_schema):
     from app.core import rate_limit
     monkeypatch.setattr(httpcore.AsyncConnectionPool, "handle_async_request", AsyncMock(
         side_effect=AssertionError("Unexpected live network")))
     engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
     CoreBase.metadata.create_all(engine)
-    Base.metadata.create_all(engine)
+    with engine.begin() as connection:
+        unrelated = unrelated_application_schema.create(connection)
     sessions = sessionmaker(bind=engine)
     key = generate_api_key(environment="test")
     with sessions() as db:
@@ -77,7 +76,7 @@ def context(monkeypatch):
            "write_guard": forbid_discovery_writes}
     with sessions() as db:
         assert db.scalar(select(func.count()).select_from(SourceRecordDB)) == 0
-        for table in Base.metadata.sorted_tables:
+        for table in unrelated.sorted_tables:
             assert db.scalar(select(func.count()).select_from(table)) == 0
     engine.dispose()
 

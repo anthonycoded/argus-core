@@ -1,12 +1,73 @@
 
 import os
+import importlib.abc
+import json
+from pathlib import Path
+import sys
 
 import pytest
-from sqlalchemy import create_engine, inspect, text
+from sqlalchemy import MetaData, create_engine, inspect, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import sessionmaker
 
 from app.core.models import CoreBase
+
+
+class CoreOnlyImports(importlib.abc.MetaPathFinder):
+    """Fail collection/execution if the Core suite loads a legacy consumer."""
+
+    excluded = (
+        "app.models", "app.database", "app.main", "app.config",
+        "app.global_chess", "app.agents", "app.routes", "app.schemas",
+        "app.clients.argus_core_client", "app.clients.classification_contracts",
+        "app.clients.discovery_contracts", "app.clients.rss_discovery_contracts",
+        "app.clients.source_contracts", "app.clients.global_chess_ollama_client",
+        "app.services.classification_coverage", "app.services.ingestion_discovery",
+        "app.services.ollama_service", "app.services.research_",
+        "app.services.synthesis_service", "app.services.rss_service",
+        "app.services.rss_utils", "app.services.topic_scoring",
+    )
+
+    def find_spec(self, fullname, path=None, target=None):
+        if any(fullname == name or fullname.startswith(name + ".")
+               or (name.endswith(("_", "global_chess")) and fullname.startswith(name))
+               for name in self.excluded):
+            raise AssertionError("Core-only suite imported legacy application code: " + fullname)
+
+
+def pytest_configure(config):
+    if config.inipath and config.inipath.name == "pytest-core.ini":
+        sys.meta_path.insert(0, CoreOnlyImports())
+
+
+@pytest.fixture
+def unrelated_application_schema():
+    """Frozen five-table sentinel, never imported from an application model.
+
+    Keep the historical table/constraint/index shapes so migration snapshots
+    continue detecting destructive changes. No ORM defaults or application
+    configuration are involved. SQLite API tests need only SERIAL's portable
+    INTEGER spelling; PostgreSQL uses the frozen DDL verbatim.
+    """
+    frozen = json.loads((Path(__file__).parent / "fixtures/unrelated_application_schema.json").read_text())
+
+    class SentinelSchema:
+        names = frozenset(frozen)
+
+        def create(self, connection):
+            for name in ("topics", "story_clusters", "topic_analyses", "research_sources", "story_cluster_members"):
+                ddl = frozen[name]["table"]
+                if connection.dialect.name == "sqlite":
+                    ddl = ddl.replace("SERIAL NOT NULL", "INTEGER NOT NULL")
+                connection.exec_driver_sql(ddl)
+                for index in frozen[name]["indexes"]:
+                    connection.exec_driver_sql(index)
+            metadata = MetaData()
+            metadata.reflect(bind=connection, only=sorted(self.names))
+            assert set(metadata.tables) == self.names
+            return metadata
+
+    return SentinelSchema()
 
 
 @pytest.fixture(scope="session")
@@ -53,7 +114,6 @@ def migration_engine(monkeypatch):
     from uuid import uuid4
     from sqlalchemy.pool import NullPool
     from app.core.config import settings
-    from app.database import Base
 
     raw = os.getenv("ARGUS_CORE_TEST_DATABASE_URL")
     if not raw:
@@ -84,8 +144,7 @@ def migration_engine(monkeypatch):
         monkeypatch.setattr(settings, "database_url", "postgresql+psycopg://127.0.0.1:1/forbidden")
         def forbidden_create_all(*args, **kwargs):
             pytest.fail("Migration tests must initialize Core entirely through Alembic.")
-        monkeypatch.setattr(CoreBase.metadata, "create_all", forbidden_create_all)
-        monkeypatch.setattr(Base.metadata, "create_all", forbidden_create_all)
+        monkeypatch.setattr(MetaData, "create_all", forbidden_create_all)
         yield target
     finally:
         if target is not None:

@@ -16,11 +16,9 @@ from alembic.autogenerate import compare_metadata
 from alembic.config import Config
 from alembic.migration import MigrationContext
 from alembic.script import ScriptDirectory
-from sqlalchemy import inspect, select, text
+from sqlalchemy import MetaData, Table, inspect, select, text
 from sqlalchemy.exc import IntegrityError
 
-from app import models as chess_models
-from app.database import Base
 from app.core.models import CoreBase
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -49,21 +47,23 @@ def assert_core_matches(connection):
     assert connection.execute(text("SELECT version_num FROM alembic_version")).scalars().all() == [HEAD]
 
 
-def create_chess_data(connection):
-    # Application schema is a pre-existing fixture, not part of Core migrations.
-    for table in Base.metadata.sorted_tables:
-        table.create(connection)
-    connection.execute(chess_models.Topic.__table__.insert().values(
+def create_unrelated_data(connection, schema):
+    # Test-owned frozen schema: no consumer models/settings/database imports.
+    metadata = schema.create(connection)
+    now = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    connection.execute(metadata.tables["topics"].insert().values(
         id=1, title="Preserve editorial topic", url="https://example.test/topic",
-        source="fixture", relevance_score=1, freshness_score=2, score=3, status="approved"))
-    connection.execute(chess_models.TopicAnalysis.__table__.insert().values(
+        source="fixture", fetched_at=now, relevance_score=1, freshness_score=2, score=3, status="approved"))
+    connection.execute(metadata.tables["topic_analyses"].insert().values(
         id=1, topic_id=1, summary="Preserve analysis", relevance=1, research_priority=2,
-        rationale="fixture", research_questions="[]", model="fixture"))
-    connection.execute(chess_models.ResearchSource.__table__.insert().values(
-        id=1, topic_id=1, title="Preserve source", url="https://example.test/research", snippet="fixture"))
-    connection.execute(chess_models.StoryClusterRecord.__table__.insert().values(
-        id=1, title="Preserve cluster", summary="fixture", confidence=1))
-    connection.execute(chess_models.StoryClusterMember.__table__.insert().values(id=1, cluster_id=1, topic_id=1))
+        rationale="fixture", research_questions="[]", model="fixture", analyzed_at=now))
+    connection.execute(metadata.tables["research_sources"].insert().values(
+        id=1, topic_id=1, title="Preserve source", url="https://example.test/research", snippet="fixture",
+        source_type="news", discovered_at=now))
+    connection.execute(metadata.tables["story_clusters"].insert().values(
+        id=1, title="Preserve cluster", summary="fixture", confidence=1, created_at=now))
+    connection.execute(metadata.tables["story_cluster_members"].insert().values(id=1, cluster_id=1, topic_id=1))
+    return metadata
 
 
 def snapshot(connection, table_names):
@@ -72,7 +72,7 @@ def snapshot(connection, table_names):
     for name in sorted(table_names):
         table = CoreBase.metadata.tables.get(name)
         if table is None:
-            table = Base.metadata.tables[name]
+            table = Table(name, MetaData(), autoload_with=connection)
         result[name] = {
             "rows": [tuple(row) for row in connection.execute(select(table).order_by(*table.primary_key.columns))],
             "oid": connection.execute(text("SELECT to_regclass(:name)::oid"), {"name": name}).scalar(),
@@ -145,7 +145,7 @@ def test_historical_baseline_has_expected_nonunique_index(migration_engine):
 
 
 @pytest.mark.parametrize("old_revision", OLD_REVISIONS)
-def test_existing_revision_preserves_core_and_chess_data(migration_engine, tmp_path, old_revision):
+def test_existing_revision_preserves_core_and_unrelated_data(migration_engine, tmp_path, old_revision, unrelated_application_schema):
     old_scripts = tmp_path / "old_migrations"
     shutil.copytree(MIGRATIONS, old_scripts, ignore=shutil.ignore_patterns("__pycache__"))
     (old_scripts / f"versions/{BASELINE}_create_historical_core_sources.py").unlink()
@@ -157,10 +157,10 @@ def test_existing_revision_preserves_core_and_chess_data(migration_engine, tmp_p
     assert ScriptDirectory.from_config(old_cfg).get_bases() == [OLD_ROOT]
     with migration_engine.begin() as connection:
         legacy_source_schema(connection)
-        create_chess_data(connection)
+        create_unrelated_data(connection, unrelated_application_schema)
         command.upgrade(configuration(connection, old_scripts), old_revision)
         seed_core(connection)
-        existing = (set(CoreBase.metadata.tables) | set(Base.metadata.tables)) & set(inspect(connection).get_table_names())
+        existing = (set(CoreBase.metadata.tables) | unrelated_application_schema.names) & set(inspect(connection).get_table_names())
         before = snapshot(connection, existing)
     with migration_engine.begin() as connection:
         command.upgrade(configuration(connection), "head")
@@ -169,21 +169,21 @@ def test_existing_revision_preserves_core_and_chess_data(migration_engine, tmp_p
         assert_core_matches(connection)
         assert connection.execute(text("SELECT count(*) FROM core_source_catalogs")).scalar_one() == 0
         assert connection.execute(text("SELECT count(*) FROM core_source_admission_events")).scalar_one() == 0
-        # Exercise env.py's actual ownership filter with populated Chess tables.
+        # Exercise env.py's actual ownership filter with populated unrelated tables.
         command.check(configuration(connection))
 
 
-def test_core_upgrade_and_disposable_downgrade_leave_chess_untouched(migration_engine):
+def test_core_upgrade_and_disposable_downgrade_leave_unrelated_tables_untouched(migration_engine, unrelated_application_schema):
     with migration_engine.begin() as connection:
-        create_chess_data(connection)
-        before = snapshot(connection, Base.metadata.tables)
+        create_unrelated_data(connection, unrelated_application_schema)
+        before = snapshot(connection, unrelated_application_schema.names)
         cfg = configuration(connection)
         command.upgrade(cfg, "head")
         assert_core_matches(connection)
         command.check(cfg)
-        assert snapshot(connection, Base.metadata.tables) == before
+        assert snapshot(connection, unrelated_application_schema.names) == before
         command.downgrade(cfg, "base")
-        assert snapshot(connection, Base.metadata.tables) == before
+        assert snapshot(connection, unrelated_application_schema.names) == before
         assert not (set(CoreBase.metadata.tables) & set(inspect(connection).get_table_names()))
 
 

@@ -166,17 +166,18 @@ def test_actual_core_lifespan_validates_and_always_shuts_down(migration_engine, 
     dispose_audit.assert_called_once()
 
 
-def test_global_chess_startup_no_longer_creates_schema(monkeypatch):
-    from app import main
-    from app.database import Base
+def test_core_startup_no_longer_creates_schema(monkeypatch):
+    from sqlalchemy import MetaData
 
-    check = Mock()
-    monkeypatch.setattr(main, "validate_global_chess_database", check)
-    forbidden = Mock(side_effect=AssertionError("Global Chess startup attempted schema creation"))
-    monkeypatch.setattr(Base.metadata, "create_all", forbidden)
-    with TestClient(main.app):
+    check = AsyncMock()
+    shutdown = AsyncMock()
+    forbidden = Mock(side_effect=AssertionError("Core startup attempted schema creation"))
+    monkeypatch.setattr(MetaData, "create_all", forbidden)
+    app = create_app(check_database=check, on_shutdown=shutdown)
+    with TestClient(app):
         pass
-    check.assert_called_once_with(main.engine)
+    check.assert_awaited_once()
+    shutdown.assert_awaited_once()
     forbidden.assert_not_called()
 
 

@@ -240,12 +240,12 @@ async def test_session_creation_failure_does_not_mask_original_exception(caplog)
 
 def test_audit_middleware_installed_once_in_core_only():
     from app.core_main import app as core_app, audit_sessions
-    from app.main import app as legacy_app
 
     installed = [entry for entry in core_app.user_middleware if entry.cls is RequestAuditMiddleware]
     assert len(installed) == 1
     assert installed[0].kwargs["session_factory"] is audit_sessions
-    assert not any(entry.cls is RequestAuditMiddleware for entry in legacy_app.user_middleware)
+    unrelated_app = create_app(title="Unrelated application")
+    assert not any(entry.cls is RequestAuditMiddleware for entry in unrelated_app.user_middleware)
 
 
 @pytest.mark.asyncio
