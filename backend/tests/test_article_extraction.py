@@ -127,7 +127,7 @@ async def test_extract_article_rejects_unsupported_content_type(
     result = await extract_article(sample_url, client)
 
     assert result["extraction_status"] == "unsupported_content"
-    assert "application/pdf" in result["extraction_error"]
+    assert result["extraction_error"] == "Unsupported content type."
 
 
 @pytest.mark.asyncio

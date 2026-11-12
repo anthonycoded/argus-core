@@ -58,7 +58,7 @@ async def extract_article_endpoint(
         raise
 
     except Exception:
-        logger.exception("Article extraction endpoint failed")
+        logger.error("Article extraction endpoint failed (category=service_error).")
 
         raise HTTPException(
             status_code=500,

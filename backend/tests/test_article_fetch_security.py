@@ -4,6 +4,7 @@ import socket
 import gzip
 import zlib
 import ssl
+import logging
 from importlib.metadata import version
 from unittest.mock import AsyncMock
 
@@ -525,3 +526,19 @@ async def test_certificate_verification_failure_fails_closed(monkeypatch):
         with pytest.raises(httpx.ConnectError, match="hostname mismatch"):
             await client.get("https://news.example/")
     raw.aclose.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_real_transport_debug_logs_do_not_disclose_urls_or_headers(monkeypatch, caplog):
+    wire = WireStream(b"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n"
+                      b"Set-Cookie: SYNTHETIC-private-cookie\r\nContent-Length: 13\r\n\r\n<html></html>")
+    monkeypatch.setattr(fetch.anyio, "getaddrinfo", AsyncMock(return_value=records("93.184.216.34")))
+    monkeypatch.setattr(fetch.AnyIOBackend, "connect_tcp", AsyncMock(return_value=wire))
+    monkeypatch.setattr(extraction.trafilatura, "extract", lambda *a, **kw: "Article. " * 40)
+    with caplog.at_level(logging.DEBUG):
+        async with httpx.AsyncClient(transport=fetch.PublicHTTPTransport(), trust_env=False) as client:
+            result = await extraction.extract_article("https://news.example/article?unlisted=SYNTHETIC", client)
+    assert result["extraction_status"] == "success"
+    assert "SYNTHETIC" not in caplog.text
+    assert "93.184.216.34" not in caplog.text
+    assert "?unlisted" not in caplog.text

@@ -97,8 +97,13 @@ def test_article_extraction_blocks_ssrf_with_existing_response_contract(client):
     )
 
     assert response.status_code == 200
-    assert response.json() == {
-        "url": "http://169.254.169.254/latest/meta-data/",
+    result = response.json()
+    provenance = result.pop("fetch_provenance")
+    assert provenance["final_url"] is None
+    assert provenance["response_received_at"] is None
+    assert provenance["urls_redacted"] is True
+    assert result == {
+        "url": None,
         "extraction_status": "request_error",
         "article_text": None,
         "extraction_error": "Unsafe article destination.",
